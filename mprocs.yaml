@@ -1,4 +1,9 @@
 procs:
+  postgres:
+    shell: "docker-compose up postgres"
+    env:
+      COMPOSE_PROJECT_NAME: terrace
+
   backend:
     shell: "cd backend && bun run start:dev"
     env:
@@ -6,5 +11,10 @@ procs:
 
   frontend:
     shell: "cd frontend && bun run dev"
+    env:
+      NODE_ENV: development
+
+  storybook:
+    shell: "cd frontend && bun run storybook"
     env:
       NODE_ENV: development

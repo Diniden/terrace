@@ -61,6 +61,10 @@ bun.lockb
 *.sqlite3
 *.db
 
+# Docker
+docker-compose.override.yml
+.docker/
+
 # Temporary files
 tmp/
 temp/
@@ -76,6 +80,11 @@ yarn.lock
 # Documentation builds
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# env
+.env
+.env.local
+.env.*
 
 # Misc
 .cache/

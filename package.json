@@ -20,6 +20,14 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "docker:start": "./scripts/docker-db.sh start",
+    "docker:stop": "./scripts/docker-db.sh stop",
+    "docker:restart": "./scripts/docker-db.sh restart",
+    "docker:down": "./scripts/docker-db.sh down",
+    "docker:logs": "./scripts/docker-db.sh logs",
+    "docker:psql": "./scripts/docker-db.sh psql",
+    "docker:reset": "./scripts/docker-db.sh reset",
+    "docker:status": "./scripts/docker-db.sh status",
     "db:reset": "bun run scripts/db-reset.ts",
     "db:seed": "bun run scripts/seed-database.ts",
     "generate": "bun run scripts/generate.ts",
@@ -32,13 +40,14 @@
     "typecheck:frontend": "cd frontend && tsc --noEmit"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.0.0",
-    "@playwright/test": "^1.56.1",
-    "@types/node": "^22.0.0",
-    "mprocs": "^0.7.3",
-    "playwright": "^1.56.1",
-    "prettier": "^3.3.3",
-    "typescript": "^5.6.2"
+    "@faker-js/faker": "9.0.0",
+    "@playwright/mcp": "0.0.43",
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.0.0",
+    "mprocs": "0.7.3",
+    "playwright": "1.56.1",
+    "prettier": "3.3.3",
+    "typescript": "5.6.2"
   },
   "engines": {
     "node": ">=20.0.0",
