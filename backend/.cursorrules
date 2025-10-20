@@ -1,0 +1,230 @@
+# Backend Cursor Rules - NestJS API
+
+## Overview
+This directory contains the NestJS backend API with TypeORM and PostgreSQL integration.
+
+## Responsible Agents
+- **REST API Agent**: Controllers, DTOs, guards, interceptors, filters
+- **Database Agent**: Entities, migrations, repositories
+- **Business Logic Agent**: Services, graph operations
+
+## Directory Structure
+```
+backend/
+├── src/
+│   ├── main.ts                 # Application entry point
+│   ├── app.module.ts           # Root module
+│   ├── <feature>/              # Feature modules
+│   │   ├── <feature>.module.ts
+│   │   ├── <feature>.controller.ts
+│   │   ├── <feature>.service.ts
+│   │   ├── entities/
+│   │   │   └── <feature>.entity.ts
+│   │   ├── dto/
+│   │   │   ├── create-<feature>.dto.ts
+│   │   │   └── update-<feature>.dto.ts
+│   │   └── <feature>.repository.ts
+│   ├── graph/                  # Graph operations
+│   │   ├── graph.module.ts
+│   │   └── graph.service.ts
+│   ├── database/
+│   │   └── migrations/         # TypeORM migrations
+│   └── common/                 # Shared utilities
+│       ├── decorators/
+│       ├── filters/
+│       ├── guards/
+│       └── interceptors/
+└── test/                       # E2E tests
+```
+
+## Conventions
+
+### Naming
+- **Files**: kebab-case (`user-profile.service.ts`)
+- **Classes**: PascalCase (`UserProfileService`)
+- **Methods**: camelCase (`findUserProfile`)
+- **Constants**: UPPER_SNAKE_CASE (`DEFAULT_PAGE_SIZE`)
+
+### Module Organization
+- Each feature has its own directory
+- Features export a module
+- Keep features as independent as possible
+- Share code through `common/` directory
+
+### Controllers
+- One controller per resource
+- Use decorators for routing: `@Get()`, `@Post()`, etc.
+- Apply DTOs for validation: `@Body() createDto: CreateNodeDto`
+- Use proper HTTP status codes
+- Add Swagger decorators: `@ApiOperation()`, `@ApiResponse()`
+- Keep controllers thin - delegate to services
+
+### Services
+- Business logic lives here
+- Inject repositories via constructor
+- One service per feature (can have multiple if needed)
+- Return domain objects, not DTOs
+- Throw NestJS exceptions: `NotFoundException`, `BadRequestException`
+
+### Entities
+- One entity per database table
+- Use TypeORM decorators
+- Define all relationships
+- Add appropriate indexes
+- Use `@CreateDateColumn()`, `@UpdateDateColumn()`
+- Use soft deletes: `@DeleteDateColumn()`
+
+### DTOs
+- Separate DTOs for create, update, and response
+- Use class-validator decorators
+- Use class-transformer when needed
+- Add Swagger decorators for API docs
+- Keep DTOs close to their controllers
+
+### Repositories
+- Extend TypeORM `Repository<T>`
+- Custom queries go here
+- Graph traversal methods
+- Complex query builders
+- Keep queries optimized
+
+### Migrations
+- Generate migrations: `bun run typeorm migration:generate`
+- Name descriptively: `CreateNodesTable`, `AddIndexToEdges`
+- Always implement `up` and `down`
+- Test migrations before committing
+- Never modify existing migrations
+
+## Code Style
+
+### Imports Order
+1. Node/external modules
+2. NestJS modules
+3. Internal modules (absolute imports)
+4. Relative imports
+
+```typescript
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { Node } from './entities/node.entity';
+import { CreateNodeDto } from './dto/create-node.dto';
+```
+
+### Dependency Injection
+```typescript
+@Injectable()
+export class NodesService {
+  constructor(
+    @InjectRepository(Node)
+    private readonly nodesRepository: Repository<Node>,
+    private readonly graphService: GraphService,
+  ) {}
+}
+```
+
+### Error Handling
+- Use NestJS built-in exceptions
+- Provide clear error messages
+- Don't expose internal details
+- Log errors appropriately
+
+### Async/Await
+- Use `async/await` over promises
+- Handle errors with try/catch
+- Return typed promises
+
+## Testing
+
+### Unit Tests
+- Place next to source: `nodes.service.spec.ts`
+- Mock dependencies
+- Test business logic thoroughly
+- Use descriptive test names
+
+### E2E Tests
+- Place in `test/` directory
+- Test full request/response cycle
+- Use test database
+- Clean up after tests
+
+## Environment Variables
+- Define in `.env`
+- Access via `ConfigService`
+- Never commit `.env`
+- Document in `.env.example`
+
+## Performance
+
+### Database
+- Use indexes on foreign keys
+- Eager load with caution
+- Use query builders for complex queries
+- Monitor slow queries
+- Use database pooling
+
+### Caching
+- Cache frequently accessed data
+- Use Redis for distributed caching
+- Invalidate cache appropriately
+- Set reasonable TTLs
+
+## Security
+
+### Authentication
+- Use guards for protected routes
+- Validate JWT tokens
+- Check permissions appropriately
+
+### Validation
+- Validate all input with DTOs
+- Use class-validator
+- Sanitize inputs
+- Validate file uploads
+
+### Rate Limiting
+- Implement rate limiting on public endpoints
+- Use throttler module
+- Configure per-route limits
+
+## API Design
+
+### REST Conventions
+- Use proper HTTP methods
+- Use proper status codes
+- Version APIs: `/api/v1/`
+- Paginate large datasets
+- Support filtering and sorting
+
+### Response Format
+```typescript
+// Success
+{ data: [...], total: 100 }
+
+// Error
+{ statusCode: 400, message: "Error description", error: "Bad Request" }
+```
+
+## Graph Operations
+
+### Best Practices
+- Set maximum traversal depth
+- Track visited nodes
+- Use recursive CTEs for complex queries
+- Cache common paths
+- Handle cycles gracefully
+
+### Performance
+- Index graph foreign keys
+- Use appropriate algorithms
+- Consider graph size
+- Monitor query performance
+
+## Updates Required
+When you make changes that affect these patterns, update this `.cursorrules` file to reflect the new conventions.
+
+## Related Rules
+- Global: `/.cursorrules`
+- Frontend: `/frontend/.cursorrules`
+- Scripts: `/scripts/.cursorrules`

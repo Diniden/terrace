@@ -1,0 +1,473 @@
+# Documentation Cursor Rules
+
+## Overview
+This directory contains all project documentation written in Markdown.
+
+## Responsible Agent
+- **Project Manager Agent**: All documentation
+
+## Directory Structure
+```
+docs/
+├── README.md               # Documentation index
+├── architecture.md         # System architecture
+├── api.md                  # API reference
+├── database.md             # Database schema
+├── graph-operations.md     # Graph algorithms
+├── development.md          # Development guide
+├── deployment.md           # Deployment guide
+├── agents.md               # Agent system guide
+└── assets/                 # Images, diagrams
+    └── architecture.png
+```
+
+## Conventions
+
+### File Naming
+- kebab-case: `graph-operations.md`
+- Descriptive names
+- Use `.md` extension
+
+### Document Structure
+```markdown
+# Document Title
+
+Brief introduction paragraph.
+
+## Section 1
+
+Content...
+
+### Subsection 1.1
+
+Content...
+
+## Section 2
+
+Content...
+
+## See Also
+
+- [Related Doc 1](./related-1.md)
+- [Related Doc 2](./related-2.md)
+```
+
+## Markdown Style
+
+### Headings
+- Use ATX-style headers: `# Header`
+- One H1 per document
+- Logical heading hierarchy (don't skip levels)
+- No trailing punctuation on headings
+
+```markdown
+# Main Title
+## Section
+### Subsection
+```
+
+### Lists
+
+#### Unordered Lists
+```markdown
+- Item 1
+- Item 2
+  - Nested item 2.1
+  - Nested item 2.2
+- Item 3
+```
+
+#### Ordered Lists
+```markdown
+1. First step
+2. Second step
+3. Third step
+```
+
+#### Task Lists
+```markdown
+- [ ] Todo item
+- [x] Completed item
+```
+
+### Code Blocks
+
+#### With Language
+```markdown
+\`\`\`typescript
+const greeting: string = "Hello, World!";
+console.log(greeting);
+\`\`\`
+```
+
+#### Inline Code
+```markdown
+Use the `useState` hook for local state.
+```
+
+### Links
+
+#### Internal Links
+```markdown
+See [Architecture](./architecture.md) for details.
+See [API Section](#api-endpoints) in this document.
+```
+
+#### External Links
+```markdown
+Visit [TypeScript Documentation](https://www.typescriptlang.org/docs/).
+```
+
+### Images
+```markdown
+![Alt text](./assets/diagram.png)
+![Architecture Diagram](./assets/architecture.png "System Architecture")
+```
+
+### Tables
+```markdown
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Value 1  | Value 2  | Value 3  |
+| Value 4  | Value 5  | Value 6  |
+```
+
+### Blockquotes
+```markdown
+> Important note or quote
+> that spans multiple lines.
+```
+
+### Emphasis
+```markdown
+*Italic text* or _italic text_
+**Bold text** or __bold text__
+***Bold and italic***
+`Code text`
+```
+
+## Content Guidelines
+
+### Writing Style
+- Use present tense
+- Use active voice
+- Be concise but complete
+- Use "you" to address the reader
+- Avoid jargon unless necessary
+- Define acronyms on first use
+
+### Good Examples
+- "Run the build command to compile the project."
+- "The API returns a JSON response."
+- "Configure the database connection in `.env`."
+
+### Bad Examples
+- "The build command should be ran..." (passive)
+- "One could run the command..." (impersonal)
+- "Basically, you just need to..." (unnecessary filler)
+
+### Code Examples
+- Include complete, working examples
+- Add comments for complex code
+- Show both input and output
+- Provide context for the example
+
+```markdown
+## Creating a Node
+
+Send a POST request with the node data:
+
+\`\`\`http
+POST /api/nodes
+Content-Type: application/json
+
+{
+  "name": "My Node",
+  "type": "custom"
+}
+\`\`\`
+
+Response:
+
+\`\`\`json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "My Node",
+  "type": "custom",
+  "createdAt": "2024-01-01T00:00:00Z"
+}
+\`\`\`
+```
+
+### API Documentation
+- Document all endpoints
+- Include HTTP method
+- List all parameters
+- Show request/response examples
+- Document error responses
+- Note authentication requirements
+
+```markdown
+### Get Node by ID
+
+\`\`\`http
+GET /api/nodes/:id
+\`\`\`
+
+**Parameters:**
+- `id` (string, required) - Node UUID
+
+**Response:**
+\`\`\`json
+{
+  "id": "uuid",
+  "name": "Node Name",
+  "type": "node-type"
+}
+\`\`\`
+
+**Errors:**
+- `404` - Node not found
+- `401` - Unauthorized
+```
+
+### Architecture Documentation
+- Include diagrams
+- Explain design decisions
+- Document data flow
+- List technologies used
+- Explain patterns used
+
+### Step-by-Step Guides
+1. Clear, numbered steps
+2. Include expected output
+3. Explain why, not just how
+4. Handle common errors
+5. Provide troubleshooting
+
+```markdown
+## Setting Up the Database
+
+1. Install PostgreSQL 14 or higher:
+   \`\`\`bash
+   brew install postgresql@14
+   \`\`\`
+
+2. Start the PostgreSQL service:
+   \`\`\`bash
+   brew services start postgresql@14
+   \`\`\`
+
+3. Create the database:
+   \`\`\`bash
+   createdb terrace_dev
+   \`\`\`
+
+4. Verify the connection:
+   \`\`\`bash
+   psql terrace_dev
+   \`\`\`
+
+   You should see the PostgreSQL prompt.
+```
+
+## Table of Contents
+
+### For Long Documents
+```markdown
+# Long Document
+
+## Table of Contents
+
+- [Section 1](#section-1)
+- [Section 2](#section-2)
+  - [Subsection 2.1](#subsection-21)
+- [Section 3](#section-3)
+
+## Section 1
+
+Content...
+```
+
+## Cross-References
+
+### Link to Other Docs
+- Use relative paths
+- Use descriptive link text
+- Keep links up to date
+
+```markdown
+For more details, see:
+- [API Documentation](./api.md)
+- [Database Schema](./database.md)
+- [Graph Operations](./graph-operations.md)
+```
+
+## Version Information
+
+### Include When Relevant
+```markdown
+> This guide is for version 1.x of the API.
+> For the legacy v0.x API, see [Legacy API](./api-v0.md).
+```
+
+## Examples and Templates
+
+### Consistent Format
+```markdown
+## Example: Creating a Graph
+
+This example shows how to create a simple graph with nodes and edges.
+
+\`\`\`typescript
+// Create nodes
+const node1 = await nodesService.create({ name: 'Node 1', type: 'entity' });
+const node2 = await nodesService.create({ name: 'Node 2', type: 'entity' });
+
+// Create edge
+const edge = await edgesService.create({
+  sourceNodeId: node1.id,
+  targetNodeId: node2.id,
+  type: 'connects-to',
+});
+\`\`\`
+
+Result: A graph with two nodes connected by one edge.
+```
+
+## Warnings and Notes
+
+### Formatting
+```markdown
+> **Warning**: This operation cannot be undone.
+
+> **Note**: This feature requires PostgreSQL 14+.
+
+> **Tip**: Use the `--dry-run` flag to test first.
+```
+
+## Maintenance
+
+### Keep Documentation Current
+- Update docs with code changes
+- Review docs in pull requests
+- Remove outdated information
+- Update screenshots and diagrams
+- Check links regularly
+
+### Deprecation Notices
+```markdown
+> **Deprecated**: This API endpoint is deprecated as of v2.0.
+> Use [/api/v2/nodes](#new-endpoint) instead.
+```
+
+## File Organization
+
+### Group Related Topics
+- One topic per file
+- Keep files focused
+- Use subdirectories for large sections
+- Create index files for navigation
+
+### Example Structure
+```
+docs/
+├── README.md                    # Main index
+├── getting-started/
+│   ├── installation.md
+│   ├── quick-start.md
+│   └── configuration.md
+├── guides/
+│   ├── graph-operations.md
+│   └── api-integration.md
+├── reference/
+│   ├── api.md
+│   ├── database.md
+│   └── cli.md
+└── contributing/
+    ├── development.md
+    └── style-guide.md
+```
+
+## Changelog Format
+
+### Follow Keep a Changelog
+```markdown
+# Changelog
+
+## [Unreleased]
+
+### Added
+- New feature
+
+### Changed
+- Updated behavior
+
+### Fixed
+- Bug fix
+
+## [1.0.0] - 2024-01-01
+
+### Added
+- Initial release
+```
+
+## README Template
+
+### For Each Module
+```markdown
+# Module Name
+
+Brief description of what this module does.
+
+## Purpose
+
+Detailed explanation of the module's purpose.
+
+## Usage
+
+\`\`\`typescript
+import { Module } from './module';
+
+const instance = new Module();
+instance.doSomething();
+\`\`\`
+
+## API
+
+### `doSomething()`
+
+Description of what this does.
+
+**Parameters:**
+- `param1` (string) - Description
+
+**Returns:**
+- `Promise<Result>` - Description
+
+## Examples
+
+See [examples directory](./examples) for more.
+
+## See Also
+
+- [Related Module](../related/README.md)
+```
+
+## Updates Required
+When documentation patterns change, update this `.cursorrules` file.
+
+## Related Rules
+- Global: `/.cursorrules`
+- All other directories for documentation needs
+
+## Quality Checklist
+
+Before committing documentation:
+- [ ] Spelling and grammar checked
+- [ ] Code examples tested
+- [ ] Links verified
+- [ ] Images included (if needed)
+- [ ] Formatting consistent
+- [ ] Technical accuracy confirmed
+- [ ] Related docs updated

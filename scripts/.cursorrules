@@ -1,0 +1,467 @@
+# Scripts Cursor Rules - Bun Automation
+
+## Overview
+This directory contains automation scripts, build tools, and developer utilities written in TypeScript and executed with Bun.
+
+## Responsible Agent
+- **DevOps Agent**: All scripts and automation
+
+## Directory Structure
+```
+scripts/
+├── build.ts                # Build all projects
+├── dev.ts                  # Run development servers
+├── db-reset.ts             # Reset database
+├── seed-database.ts        # Seed with test data
+├── generate.ts             # Code generation
+├── test.ts                 # Test runner
+└── utils/                  # Shared utilities
+    ├── logger.ts
+    └── paths.ts
+```
+
+## Conventions
+
+### File Naming
+- kebab-case: `seed-database.ts`, `db-reset.ts`
+- Descriptive names that indicate purpose
+- Use `.ts` extension (not `.js`)
+
+### Script Structure
+```typescript
+#!/usr/bin/env bun
+
+import { parseArgs } from 'util';
+
+interface ScriptOptions {
+  // Option types
+}
+
+async function main(options: ScriptOptions) {
+  // Script logic
+}
+
+// Parse arguments
+const args = parseArgs({
+  options: {
+    option: { type: 'boolean', short: 'o' },
+  },
+});
+
+main(args.values as ScriptOptions).catch((error) => {
+  console.error('❌ Error:', error);
+  process.exit(1);
+});
+```
+
+### Shebang Line
+- Always include: `#!/usr/bin/env bun`
+- Makes script executable directly
+- Don't forget: `chmod +x script.ts`
+
+## Code Style
+
+### Imports
+```typescript
+// Bun APIs
+import { $ } from 'bun';
+import { spawn } from 'bun';
+
+// Node APIs
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+// Project imports
+import { logger } from './utils/logger';
+```
+
+### Shell Commands
+```typescript
+// Use Bun's $ for shell commands
+await $`bun install`;
+await $`mkdir -p dist`;
+
+// Capture output
+const result = await $`ls -la`.text();
+
+// Run in specific directory
+await $`bun run build`.cwd('./backend');
+
+// Run quietly (no output)
+await $`bun test`.quiet();
+```
+
+### Process Spawning
+```typescript
+// Spawn long-running process
+const proc = spawn(['bun', 'run', 'dev'], {
+  cwd: './backend',
+  stdout: 'pipe',
+  stderr: 'pipe',
+});
+
+// Handle output
+for await (const chunk of proc.stdout) {
+  console.log(new TextDecoder().decode(chunk));
+}
+
+// Wait for exit
+await proc.exited;
+```
+
+## Console Output
+
+### Formatting
+- Use emoji for visual clarity
+- Color code by severity
+- Provide progress indicators
+- Show clear success/failure
+
+```typescript
+console.log('🚀 Starting process...');
+console.log('  ✓ Step 1 completed');
+console.log('  ✓ Step 2 completed');
+console.log('✅ Process complete!');
+
+console.error('❌ Error occurred');
+console.warn('⚠️  Warning message');
+console.info('ℹ️  Information');
+```
+
+### Progress Indicators
+```typescript
+for (let i = 0; i < total; i++) {
+  // Do work
+  console.log(`  Progress: ${i + 1}/${total}`);
+}
+```
+
+### Colors
+```typescript
+const colors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+};
+
+console.log(`${colors.green}Success!${colors.reset}`);
+```
+
+## Error Handling
+
+### Always Catch Errors
+```typescript
+async function main() {
+  try {
+    await riskyOperation();
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('❌ Error:', error.message);
+    } else {
+      console.error('❌ Unknown error:', error);
+    }
+    process.exit(1);
+  }
+}
+```
+
+### Exit Codes
+- `0`: Success
+- `1`: Generic error
+- `2`: Misuse of command
+- Custom codes for specific errors
+
+### Validation
+```typescript
+// Validate inputs
+if (!options.required) {
+  console.error('❌ Missing required option: --required');
+  process.exit(1);
+}
+
+// Validate paths
+if (!existsSync(filePath)) {
+  console.error(`❌ File not found: ${filePath}`);
+  process.exit(1);
+}
+```
+
+## Arguments Parsing
+
+### Using parseArgs
+```typescript
+import { parseArgs } from 'util';
+
+const args = parseArgs({
+  options: {
+    nodes: { type: 'string', short: 'n' },
+    edges: { type: 'string', short: 'e' },
+    clear: { type: 'boolean', short: 'c' },
+    help: { type: 'boolean', short: 'h' },
+  },
+});
+
+if (args.values.help) {
+  showHelp();
+  process.exit(0);
+}
+```
+
+### Manual Parsing
+```typescript
+const args = process.argv.slice(2);
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === '--option' && args[i + 1]) {
+    option = args[i + 1];
+    i++;
+  }
+}
+```
+
+## File Operations
+
+### Reading Files
+```typescript
+// Read file
+const content = await Bun.file('path/to/file').text();
+
+// Read JSON
+const data = await Bun.file('package.json').json();
+
+// Check existence
+const exists = await Bun.file('file.txt').exists();
+```
+
+### Writing Files
+```typescript
+// Write text
+await Bun.write('output.txt', 'content');
+
+// Write JSON
+await Bun.write('data.json', JSON.stringify(data, null, 2));
+
+// Write to specific location
+await Bun.write(join(process.cwd(), 'output.txt'), content);
+```
+
+### Directory Operations
+```typescript
+import { mkdirSync, existsSync, rmSync } from 'fs';
+
+// Create directory
+if (!existsSync(dir)) {
+  mkdirSync(dir, { recursive: true });
+}
+
+// Remove directory
+if (existsSync(dir)) {
+  rmSync(dir, { recursive: true });
+}
+```
+
+## Testing Scripts
+
+### Test Runner
+```typescript
+#!/usr/bin/env bun
+
+import { $ } from 'bun';
+
+async function runTests() {
+  console.log('🧪 Running tests...\n');
+
+  try {
+    // Backend tests
+    console.log('📦 Backend tests...');
+    await $`bun test`.cwd('./backend');
+
+    // Frontend tests
+    console.log('📦 Frontend tests...');
+    await $`bun test`.cwd('./frontend');
+
+    console.log('\n✅ All tests passed!');
+  } catch (error) {
+    console.error('\n❌ Tests failed');
+    process.exit(1);
+  }
+}
+
+runTests();
+```
+
+## Database Scripts
+
+### Safe Operations
+```typescript
+// Always confirm destructive operations
+async function confirmAction(message: string): Promise<boolean> {
+  console.log(`⚠️  ${message}`);
+  console.log('Type "yes" to confirm:');
+
+  // Read from stdin
+  const answer = await Bun.stdin.text();
+  return answer.trim().toLowerCase() === 'yes';
+}
+
+// Use confirmation
+if (options.drop) {
+  const confirmed = await confirmAction('This will delete all data!');
+  if (!confirmed) {
+    console.log('❌ Cancelled');
+    process.exit(0);
+  }
+}
+```
+
+### Connection Management
+```typescript
+// Always close connections
+try {
+  const connection = await createConnection();
+  await performOperations(connection);
+} finally {
+  await connection.close();
+}
+```
+
+## Performance
+
+### Parallel Operations
+```typescript
+// Run tasks in parallel
+await Promise.all([
+  buildBackend(),
+  buildFrontend(),
+  runLinting(),
+]);
+```
+
+### Sequential Operations
+```typescript
+// Run tasks in sequence
+await buildBackend();
+await buildFrontend();
+await runTests();
+```
+
+### Timing
+```typescript
+const start = Date.now();
+await operation();
+const duration = Date.now() - start;
+console.log(`⏱️  Completed in ${duration}ms`);
+```
+
+## Code Generation
+
+### Templates
+```typescript
+function generateComponent(name: string): string {
+  const pascalName = toPascalCase(name);
+
+  return `import { memo } from 'react';
+
+interface ${pascalName}Props {
+  // Props
+}
+
+export const ${pascalName} = memo<${pascalName}Props>(() => {
+  return <div>${pascalName}</div>;
+});
+
+${pascalName}.displayName = '${pascalName}';
+`;
+}
+```
+
+### File Generation
+```typescript
+async function generateFile(path: string, content: string) {
+  // Ensure directory exists
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  // Write file
+  await Bun.write(path, content);
+  console.log(`✅ Created: ${path}`);
+}
+```
+
+## Utility Functions
+
+### String Transformations
+```typescript
+export function toPascalCase(str: string): string {
+  return str
+    .split(/[-_\s]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+}
+
+export function toKebabCase(str: string): string {
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+export function toCamelCase(str: string): string {
+  const pascal = toPascalCase(str);
+  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
+}
+```
+
+## Documentation
+
+### Help Text
+```typescript
+function showHelp() {
+  console.log(`
+Usage: bun run script.ts [options]
+
+Options:
+  --option, -o    Option description
+  --help, -h      Show this help message
+
+Examples:
+  bun run script.ts --option value
+  bun run script.ts -o value
+  `);
+}
+```
+
+## Updates Required
+When you create new patterns or utilities, update this `.cursorrules` file.
+
+## Related Rules
+- Global: `/.cursorrules`
+- Backend: `/backend/.cursorrules`
+- Frontend: `/frontend/.cursorrules`
+
+## Package.json Integration
+
+### Add Script Shortcuts
+```json
+{
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "build": "bun run scripts/build.ts",
+    "db:reset": "bun run scripts/db-reset.ts",
+    "db:seed": "bun run scripts/seed-database.ts",
+    "generate": "bun run scripts/generate.ts"
+  }
+}
+```
+
+## Remember
+- Scripts should be fast and reliable
+- Always provide clear feedback
+- Handle errors gracefully
+- Make scripts idempotent when possible
+- Document complex scripts

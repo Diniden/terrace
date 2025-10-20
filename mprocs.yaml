@@ -1,0 +1,10 @@
+procs:
+  backend:
+    shell: "cd backend && bun run start:dev"
+    env:
+      NODE_ENV: development
+
+  frontend:
+    shell: "cd frontend && bun run dev"
+    env:
+      NODE_ENV: development

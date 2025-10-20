@@ -1,0 +1,47 @@
+{
+  "name": "terrace",
+  "version": "0.1.0",
+  "description": "NestJS + React + PostgreSQL application with node-edge graph support",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "mprocs",
+    "dev:legacy": "bun run scripts/dev.ts",
+    "build": "bun run scripts/build.ts",
+    "build:backend": "bun run scripts/build.ts --backend-only",
+    "build:frontend": "bun run scripts/build.ts --frontend-only",
+    "build:clean": "bun run scripts/build.ts --clean",
+    "test": "bun run test:backend && bun run test:frontend",
+    "test:backend": "cd backend && bun test",
+    "test:frontend": "cd frontend && bun test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "db:reset": "bun run scripts/db-reset.ts",
+    "db:seed": "bun run scripts/seed-database.ts",
+    "generate": "bun run scripts/generate.ts",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "typecheck": "bun run typecheck:backend && bun run typecheck:frontend",
+    "typecheck:backend": "cd backend && tsc --noEmit",
+    "typecheck:frontend": "cd frontend && tsc --noEmit"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.0.0",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.0.0",
+    "mprocs": "^0.7.3",
+    "playwright": "^1.56.1",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
+  }
+}

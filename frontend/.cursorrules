@@ -1,0 +1,362 @@
+# Frontend Cursor Rules - React + TypeScript
+
+## Overview
+This directory contains the React frontend application with TypeScript and Vite.
+
+## Responsible Agent
+- **Frontend Architect Agent**: All frontend code
+
+## Directory Structure
+```
+frontend/
+├── src/
+│   ├── main.tsx                # Application entry
+│   ├── App.tsx                 # Root component
+│   ├── components/             # Reusable components
+│   │   ├── Button/
+│   │   │   ├── Button.tsx
+│   │   │   ├── Button.module.css
+│   │   │   └── index.ts
+│   │   └── ...
+│   ├── pages/                  # Route pages
+│   │   ├── Home/
+│   │   ├── Nodes/
+│   │   └── Graph/
+│   ├── hooks/                  # Custom hooks
+│   │   ├── useNodes.ts
+│   │   └── useGraph.ts
+│   ├── api/                    # API client
+│   │   ├── client.ts
+│   │   ├── nodes.ts
+│   │   └── edges.ts
+│   ├── types/                  # TypeScript types
+│   │   ├── node.ts
+│   │   └── edge.ts
+│   ├── store/                  # State management
+│   ├── utils/                  # Utility functions
+│   └── styles/                 # Global styles
+├── public/                     # Static assets
+└── index.html                  # HTML template
+```
+
+## Conventions
+
+### Naming
+- **Files**: PascalCase for components (`Button.tsx`), camelCase for utilities (`formatDate.ts`)
+- **Components**: PascalCase (`NodeCard`)
+- **Hooks**: camelCase with `use` prefix (`useNodes`)
+- **Types**: PascalCase (`Node`, `NodeProps`)
+- **CSS Modules**: PascalCase for files (`Button.module.css`)
+
+### Component Structure
+```typescript
+// Component file structure
+import { memo } from 'react';
+import type { ReactNode } from 'react';
+import styles from './Component.module.css';
+
+interface ComponentProps {
+  // Props interface
+}
+
+export const Component = memo<ComponentProps>(({ prop }) => {
+  // Component logic
+  return (
+    <div className={styles.container}>
+      {/* JSX */}
+    </div>
+  );
+});
+
+Component.displayName = 'Component';
+```
+
+### Component Organization
+- One component per file
+- Export component from index.ts
+- Colocate styles with component
+- Keep components small and focused
+- Separate container and presentational components
+
+### Props Interface
+```typescript
+interface ButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+  className?: string;
+}
+```
+
+### Hooks
+- Custom hooks start with `use`
+- Return object with named properties
+- Include loading and error states
+- Memoize callbacks with `useCallback`
+- Memoize values with `useMemo`
+
+```typescript
+export const useNodes = () => {
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Hook logic
+
+  return { nodes, loading, error, refetch };
+};
+```
+
+### TypeScript
+
+#### No `any`
+- Use proper types always
+- Use `unknown` if type is truly unknown
+- Use generic types when appropriate
+
+#### Type Definitions
+```typescript
+// Prefer interfaces for objects
+interface Node {
+  id: string;
+  name: string;
+}
+
+// Use types for unions, intersections, and utility types
+type NodeStatus = 'active' | 'inactive' | 'pending';
+type NodeWithEdges = Node & { edges: Edge[] };
+```
+
+#### Generic Components
+```typescript
+interface ListProps<T> {
+  items: T[];
+  renderItem: (item: T) => ReactNode;
+}
+
+export const List = <T,>({ items, renderItem }: ListProps<T>) => {
+  return <ul>{items.map(renderItem)}</ul>;
+};
+```
+
+## Code Style
+
+### Imports Order
+1. React imports
+2. External libraries
+3. Internal components
+4. Internal utilities
+5. Types
+6. Styles
+
+```typescript
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { Button } from '@/components/Button';
+import { useNodes } from '@/hooks/useNodes';
+import type { Node } from '@/types/node';
+import styles from './Page.module.css';
+```
+
+### State Management
+- Use `useState` for local state
+- Use custom hooks for shared logic
+- Consider Context API for global state
+- Use state management library if needed (Zustand, etc.)
+
+### Performance
+
+#### Memoization
+```typescript
+// Memo expensive components
+export const ExpensiveComponent = memo(({ data }) => {
+  return <div>{/* render */}</div>;
+});
+
+// Memoize expensive calculations
+const sortedNodes = useMemo(
+  () => nodes.sort((a, b) => a.name.localeCompare(b.name)),
+  [nodes]
+);
+
+// Memoize callbacks
+const handleClick = useCallback(() => {
+  // handler
+}, [dependencies]);
+```
+
+#### Code Splitting
+```typescript
+// Lazy load routes
+const HomePage = lazy(() => import('./pages/Home'));
+const NodesPage = lazy(() => import('./pages/Nodes'));
+
+// Wrap in Suspense
+<Suspense fallback={<Loading />}>
+  <Routes>
+    <Route path="/" element={<HomePage />} />
+    <Route path="/nodes" element={<NodesPage />} />
+  </Routes>
+</Suspense>
+```
+
+#### Images
+- Lazy load images
+- Use appropriate formats (WebP)
+- Provide alt text
+- Use loading="lazy"
+
+## Styling
+
+### CSS Modules
+- One module per component
+- Use camelCase for class names
+- Compose styles when needed
+
+```css
+/* Button.module.css */
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+}
+
+.primary {
+  composes: button;
+  background: blue;
+}
+
+.secondary {
+  composes: button;
+  background: gray;
+}
+```
+
+### Responsive Design
+- Mobile-first approach
+- Use CSS variables for theming
+- Test on multiple screen sizes
+
+## API Integration
+
+### API Client
+```typescript
+// Centralized API client
+class ApiClient {
+  private baseUrl: string;
+
+  async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    // Implementation
+  }
+
+  get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' });
+  }
+}
+```
+
+### Error Handling
+```typescript
+try {
+  const data = await api.getNodes();
+  setNodes(data);
+} catch (error) {
+  if (error instanceof Error) {
+    setError(error);
+  }
+}
+```
+
+## Accessibility
+
+### Semantic HTML
+- Use semantic elements: `<nav>`, `<main>`, `<article>`
+- Use `<button>` for clickable elements
+- Use proper heading hierarchy
+
+### ARIA
+- Add `aria-label` for icon buttons
+- Use `aria-labelledby` and `aria-describedby`
+- Manage focus appropriately
+- Add `role` when needed
+
+### Keyboard Navigation
+- Ensure all interactive elements are keyboard accessible
+- Manage focus for modals
+- Support escape key for closing
+- Provide skip links
+
+## Testing
+
+### Component Tests
+```typescript
+import { render, screen } from '@testing-library/react';
+import { Button } from './Button';
+
+describe('Button', () => {
+  it('renders children', () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByText('Click me')).toBeInTheDocument();
+  });
+});
+```
+
+### User Interactions
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+
+it('calls onClick when clicked', () => {
+  const handleClick = vi.fn();
+  render(<Button onClick={handleClick}>Click</Button>);
+
+  fireEvent.click(screen.getByText('Click'));
+  expect(handleClick).toHaveBeenCalledTimes(1);
+});
+```
+
+## Environment Variables
+- Prefix with `VITE_`: `VITE_API_URL`
+- Access via `import.meta.env.VITE_API_URL`
+- Define types in `vite-env.d.ts`
+
+## Forms
+
+### Form Handling
+```typescript
+const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  const formData = new FormData(e.currentTarget);
+  const data = Object.fromEntries(formData);
+  // Process data
+};
+```
+
+### Validation
+- Validate on submit
+- Show errors clearly
+- Use HTML5 validation
+- Consider form library (React Hook Form)
+
+## Error Handling
+
+### Error Boundary
+- Wrap app in ErrorBoundary
+- Provide fallback UI
+- Log errors appropriately
+
+### Loading States
+```typescript
+if (loading) return <Spinner />;
+if (error) return <ErrorMessage error={error} />;
+if (!data) return <EmptyState />;
+
+return <DataView data={data} />;
+```
+
+## Updates Required
+When you make changes that affect these patterns, update this `.cursorrules` file to reflect the new conventions.
+
+## Related Rules
+- Global: `/.cursorrules`
+- Backend: `/backend/.cursorrules`
