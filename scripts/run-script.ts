@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { select, confirm, cancel, intro, outro, spinner } from '@clack/prompts';
+import { select, confirm, cancel, intro, outro, spinner, text } from '@clack/prompts';
 import { readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { spawn } from 'bun';
@@ -179,13 +179,6 @@ async function showMenu(): Promise<void> {
     }
   }
 
-  // Add exit option
-  selectOptions.push({
-    value: 'exit',
-    label: pc.red('\nExit'),
-    hint: 'Quit the script runner',
-  });
-
   const selected = await select({
     message: 'Select a script to run:',
     options: selectOptions.filter((opt) => !opt.value.startsWith('separator:')),
@@ -193,12 +186,8 @@ async function showMenu(): Promise<void> {
 
   if (typeof selected === 'symbol') {
     cancel('Operation cancelled');
-    process.exit(0);
-  }
-
-  if (selected === 'exit') {
-    outro(pc.cyan('Goodbye!'));
-    process.exit(0);
+    await showMenu();
+    return;
   }
 
   console.log(''); // Add spacing
@@ -221,34 +210,43 @@ async function showMenu(): Promise<void> {
 
   console.log(''); // Add spacing
 
-  // Ask if user wants to run another script
-  const runAnother = await confirm({
-    message: 'Run another script?',
-    initialValue: true,
+  // Wait for user to press enter
+  await text({
+    message: 'Press enter to continue',
+    placeholder: '',
+    defaultValue: '',
   });
 
-  if (runAnother) {
-    await showMenu();
-  } else {
-    outro(pc.cyan('Thanks for using Script Runner!'));
-    process.exit(0);
-  }
+  // Always return to menu
+  await showMenu();
 }
 
 /**
  * Main entry point
  */
 async function main(): Promise<void> {
-  try {
-    await showMenu();
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('cancelled')) {
-      cancel('Operation cancelled');
-      process.exit(0);
-    }
+  // Run the menu loop indefinitely until killed
+  while (true) {
+    try {
+      await showMenu();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('cancelled')) {
+        cancel('Operation cancelled');
+        continue; // Go back to menu
+      }
 
-    console.error(pc.red('Unexpected error:'), error);
-    process.exit(1);
+      console.error(pc.red('Unexpected error:'), error);
+      console.log(''); // Add spacing
+
+      // Wait for user to press enter
+      await text({
+        message: 'Press enter to continue',
+        placeholder: '',
+        defaultValue: '',
+      });
+
+      continue; // Go back to menu
+    }
   }
 }
 

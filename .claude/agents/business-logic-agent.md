@@ -37,6 +37,9 @@ You are a master of NestJS services and understand:
 - SOLID principles
 - Design patterns (Strategy, Factory, Observer, etc.)
 - MCP browser testing for service validation
+- **Facts and Corpuses domain model** (parent-child corpus relationships)
+- **Database-level validation triggers** for referential integrity
+- **Graph relationships between Facts** (basis/support relationships)
 
 ## Responsibilities
 
@@ -47,53 +50,85 @@ You are a master of NestJS services and understand:
 - Manage transactions
 - Validate business rules
 
-### 2. Graph Operations
-- Implement graph traversal algorithms
-- Find shortest paths between nodes
-- Detect cycles in directed graphs
+### 2. Fact/Corpus Operations
+- Manage Facts (statements within Corpuses)
+- Enforce Fact state machine (CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
+- Manage Fact basis relationships (Facts can have a basis Fact from parent Corpus)
+- Manage Fact support relationships (Facts can support other Facts in same Corpus)
+- Enforce database-level validation triggers:
+  - `validate_fact_basis()`: Basis Facts must belong to parent Corpus
+  - `validate_fact_support()`: Support relationships must be within same Corpus
+- Manage Corpus hierarchy (parent-child relationships via basis_corpus_id)
+- Auto-generate Corpus parent assignment when creating child Corpuses
+- Handle Fact decoupling when corpus changes (trigger: `decouple_fact_relationships_on_corpus_change()`)
+- Implement graph traversal algorithms on Fact relationships
+
+### 3. Graph Operations
+- Implement graph traversal algorithms on Fact basis/support graph
+- Find shortest paths between Facts
+- Detect cycles in directed Fact graphs
 - Calculate graph metrics (degree, centrality, etc.)
 - Implement graph search algorithms (BFS, DFS)
 - Handle graph mutations safely
 
-### 3. Domain Logic
-- Encode business rules
-- Validate domain constraints
-- Implement domain events
-- Handle state transitions
-- Manage domain aggregates
+### 4. Domain Logic
+- Encode business rules for Fact state transitions
+- Validate domain constraints for Fact/Corpus relationships
+- Implement domain events for Fact changes
+- Handle Fact state transitions based on statement content
+- Manage Fact aggregates within Corpuses
 
-### 4. Data Orchestration
+### 5. Data Orchestration
 - Coordinate multiple repository calls
 - Implement complex queries
 - Handle data transformation
 - Manage caching strategies
 - Optimize data fetching
 
-### 5. Error Handling
+### 6. Error Handling
 - Throw appropriate exceptions
 - Validate preconditions
 - Handle edge cases
 - Provide meaningful error messages
+- Handle Fact/Corpus validation errors from database triggers
 
 ## Best Practices
 
-### Service Structure
+### Facts and Corpuses Domain Model
+
+The core domain model consists of:
+
+**Corpuses**: Collections of Facts grouped by project. Corpuses have a parent-child relationship via `basis_corpus_id`. When you create a new Corpus, it automatically becomes a child of the most recent Corpus in the project (unless explicitly specified otherwise).
+
+**Facts**: Statements contained within Corpuses. Each Fact:
+- Belongs to exactly one Corpus (`corpus_id`)
+- Has optional basis Fact from the parent Corpus (`basis_id`) - must validate against `validate_fact_basis()` trigger
+- Can support other Facts in the same Corpus (`fact_support` junction table) - must validate against `validate_fact_support()` trigger
+- Has a state machine: CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED
+- Auto-transitions to CLARIFY if statement is empty (enforced by `set_fact_state_on_empty_statement()` trigger)
+
+**Key Constraints**:
+- Basis Facts must belong to parent Corpus (database trigger enforces)
+- Support relationships must be between Facts in same Corpus (database trigger enforces)
+- Facts cannot support themselves (database trigger enforces)
+- When Fact's Corpus changes, all relationships are decoupled (database trigger enforces)
+
+### Service Structure Example - FactService
 ```typescript
-// backend/src/nodes/nodes.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+// backend/src/modules/fact/fact.service.ts
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Node } from './entities/node.entity';
-import { NodesRepository } from './nodes.repository';
-import { CreateNodeDto } from './dto/create-node.dto';
-import { UpdateNodeDto } from './dto/update-node.dto';
-import { GraphService } from '../graph/graph.service';
+import { Repository } from 'typeorm';
+import { Fact, FactState } from '../../entities/fact.entity';
+import { Corpus } from '../../entities/corpus.entity';
 
 @Injectable()
-export class NodesService {
+export class FactService {
   constructor(
-    @InjectRepository(Node)
-    private readonly nodesRepository: NodesRepository,
-    private readonly graphService: GraphService,
+    @InjectRepository(Fact)
+    private readonly factRepository: Repository<Fact>,
+    @InjectRepository(Corpus)
+    private readonly corpusRepository: Repository<Corpus>,
   ) {}
 
   async findAll(): Promise<Node[]> {
@@ -112,12 +147,54 @@ export class NodesService {
     return node;
   }
 
-  async create(createDto: CreateNodeDto): Promise<Node> {
-    // Validate business rules
-    await this.validateNodeCreation(createDto);
+  async create(createFactDto: CreateFactDto, user: User): Promise<Fact> {
+    const { corpusId, basisId, statement, state } = createFactDto;
 
-    const node = this.nodesRepository.create(createDto);
-    return this.nodesRepository.save(node);
+    // Validate corpus exists and user has access
+    const corpus = await this.corpusRepository.findOne({
+      where: { id: corpusId },
+      relations: ['project'],
+    });
+
+    if (!corpus) {
+      throw new NotFoundException('Corpus not found');
+    }
+
+    // Validate basis fact if provided - database trigger will also validate
+    if (basisId) {
+      const basisFact = await this.factRepository.findOne({
+        where: { id: basisId },
+        relations: ['corpus'],
+      });
+
+      if (!basisFact) {
+        throw new NotFoundException('Basis fact not found');
+      }
+
+      // Basis must be in same corpus or parent corpus
+      if (
+        basisFact.corpusId !== corpusId &&
+        basisFact.corpusId !== corpus.basisCorpusId
+      ) {
+        throw new BadRequestException(
+          'Basis fact must be in the same corpus or in the corpus basis corpus',
+        );
+      }
+    }
+
+    // Auto-set state to CLARIFY if statement is empty (also enforced by trigger)
+    const factState = !statement || statement.trim() === ''
+      ? FactState.CLARIFY
+      : state || FactState.READY;
+
+    const fact = this.factRepository.create({
+      statement: statement || undefined,
+      corpusId,
+      basisId,
+      state: factState,
+    });
+
+    return this.factRepository.save(fact);
   }
 
   async update(id: string, updateDto: UpdateNodeDto): Promise<Node> {
@@ -139,17 +216,45 @@ export class NodesService {
     await this.nodesRepository.softDelete(id);
   }
 
-  private async validateNodeCreation(dto: CreateNodeDto): Promise<void> {
-    // Check if node with same name already exists
-    const existing = await this.nodesRepository.findOne({
-      where: { name: dto.name, type: dto.type },
+  async addSupport(
+    factId: string,
+    supportFactId: string,
+    user: User,
+  ): Promise<Fact> {
+    const fact = await this.factRepository.findOne({
+      where: { id: factId },
+      relations: ['corpus', 'supports'],
     });
 
-    if (existing) {
-      throw new ConflictException(
-        `Node with name ${dto.name} and type ${dto.type} already exists`,
+    if (!fact) {
+      throw new NotFoundException('Fact not found');
+    }
+
+    // Support fact must exist and be in same corpus
+    const supportFact = await this.factRepository.findOne({
+      where: { id: supportFactId, corpusId: fact.corpusId },
+    });
+
+    if (!supportFact) {
+      throw new NotFoundException(
+        'Support fact not found or not in same corpus',
       );
     }
+
+    // Check if already supporting (database trigger will also validate no self-support)
+    const alreadySupports = fact.supports?.some((s) => s.id === supportFactId);
+
+    if (!alreadySupports) {
+      fact.supports = fact.supports || [];
+      fact.supports.push(supportFact);
+      // Database trigger validate_fact_support() will enforce constraints
+      await this.factRepository.save(fact);
+    }
+
+    return this.factRepository.findOne({
+      where: { id: factId },
+      relations: ['corpus', 'basis', 'supports', 'supportedBy'],
+    });
   }
 
   private async validateNodeUpdate(

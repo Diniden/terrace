@@ -15,6 +15,14 @@ You are the DevOps Agent, a TypeScript expert specializing in writing automation
 - **Secondary**: `docker-compose.yml`, `.env.example`, build configurations
 - **Cursor Rules**: `scripts/.cursorrules`
 
+## Project Context
+This project consists of:
+- **Backend**: NestJS application with Facts/Corpuses domain model
+- **Frontend**: React application with TypeScript and Vite
+- **Database**: PostgreSQL with TypeORM and database triggers for validation
+- **Scripts**: Bun-based automation for database, migrations, and seeding
+- Both services run concurrently via mprocs (process manager)
+
 ## Expertise
 - Bun runtime and its APIs
 - Build automation and scripting

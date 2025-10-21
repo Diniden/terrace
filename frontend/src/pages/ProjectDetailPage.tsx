@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { projectsApi } from '../api/projects';
-import { corpusesApi } from '../api/corpuses';
-import { factsApi } from '../api/facts';
-import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/common/Button';
-import { Spinner } from '../components/common/Spinner';
-import { Modal } from '../components/common/Modal';
-import { TextInput } from '../components/common/TextInput';
-import { PageHeader } from '../components/common/PageHeader';
-import { FactCard } from '../components/user/FactCard';
-import type { Project, Corpus, Fact, FactState } from '../types';
-import './ProjectDetailPage.css';
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { projectsApi } from "../api/projects";
+import { corpusesApi } from "../api/corpuses";
+import { factsApi } from "../api/facts";
+import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/common/Button";
+import { Spinner } from "../components/common/Spinner";
+import { Modal } from "../components/common/Modal";
+import { TextInput } from "../components/common/TextInput";
+import { PageHeader } from "../components/common/PageHeader";
+import { PageFooter } from "../components/common/PageFooter";
+import { FactCard } from "../components/user/FactCard";
+import type { Project, Corpus, Fact, FactState } from "../types";
+import "./ProjectDetailPage.css";
 
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -20,15 +21,17 @@ export const ProjectDetailPage: React.FC = () => {
 
   const [project, setProject] = useState<Project | null>(null);
   const [corpuses, setCorpuses] = useState<Corpus[]>([]);
-  const [factsByCorpus, setFactsByCorpus] = useState<Record<string, Fact[]>>({});
+  const [factsByCorpus, setFactsByCorpus] = useState<Record<string, Fact[]>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [showNewCorpusModal, setShowNewCorpusModal] = useState(false);
-  const [newCorpusName, setNewCorpusName] = useState('');
+  const [newCorpusName, setNewCorpusName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [llmInput, setLlmInput] = useState('');
+  const [llmInput, setLlmInput] = useState("");
   const [isListening, setIsListening] = useState(false);
 
-  const llmInputRef = useRef<HTMLInputElement>(null);
+  const llmInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
 
@@ -40,22 +43,23 @@ export const ProjectDetailPage: React.FC = () => {
 
   useEffect(() => {
     // Initialize speech recognition
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.lang = "en-US";
 
-      let finalTranscript = '';
+      let finalTranscript = "";
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = '';
+        let interimTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
+            finalTranscript += transcript + " ";
           } else {
             interimTranscript += transcript;
           }
@@ -75,7 +79,7 @@ export const ProjectDetailPage: React.FC = () => {
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+        console.error("Speech recognition error:", event.error);
         stopListening();
       };
 
@@ -93,24 +97,25 @@ export const ProjectDetailPage: React.FC = () => {
     const handleKeyPress = (e: KeyboardEvent) => {
       // Check if user is already focusing an input element
       const activeElement = document.activeElement;
-      const isInputFocused = activeElement instanceof HTMLInputElement ||
-                            activeElement instanceof HTMLTextAreaElement;
+      const isInputFocused =
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement;
 
       if (isInputFocused) return;
 
-      if (e.key === 'l') {
+      if (e.key === "l") {
         e.preventDefault();
         llmInputRef.current?.focus();
-      } else if (e.key === 'k') {
+      } else if (e.key === "k") {
         e.preventDefault();
         startListening();
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener("keydown", handleKeyPress);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -134,7 +139,7 @@ export const ProjectDetailPage: React.FC = () => {
       setCorpuses(corpusesData.data);
 
       // Load facts for each corpus
-      const factsPromises = corpusesData.data.map(corpus =>
+      const factsPromises = corpusesData.data.map((corpus) =>
         factsApi.getAll(corpus.id)
       );
       const factsResults = await Promise.all(factsPromises);
@@ -146,7 +151,7 @@ export const ProjectDetailPage: React.FC = () => {
 
       setFactsByCorpus(factsByCorpusMap);
     } catch (err) {
-      console.error('Failed to load project data:', err);
+      console.error("Failed to load project data:", err);
     } finally {
       setLoading(false);
     }
@@ -163,10 +168,10 @@ export const ProjectDetailPage: React.FC = () => {
         projectId,
       });
       setShowNewCorpusModal(false);
-      setNewCorpusName('');
+      setNewCorpusName("");
       await loadProjectData();
     } catch (err) {
-      console.error('Failed to create corpus:', err);
+      console.error("Failed to create corpus:", err);
     } finally {
       setCreating(false);
     }
@@ -177,7 +182,7 @@ export const ProjectDetailPage: React.FC = () => {
       await factsApi.create({ corpusId });
       await loadProjectData();
     } catch (err) {
-      console.error('Failed to create fact:', err);
+      console.error("Failed to create fact:", err);
     }
   };
 
@@ -219,13 +224,13 @@ export const ProjectDetailPage: React.FC = () => {
     const ordered: Corpus[] = [];
 
     // Find the root corpus (no basisCorpusId)
-    let current = corpuses.find(c => !c.basisCorpusId);
+    let current = corpuses.find((c) => !c.basisCorpusId);
 
     // Traverse the chain from root to leaves
     while (current) {
       ordered.push(current);
       // Find the child of current corpus
-      const child = corpuses.find(c => c.basisCorpusId === current!.id);
+      const child = corpuses.find((c) => c.basisCorpusId === current!.id);
       current = child;
     }
 
@@ -255,7 +260,7 @@ export const ProjectDetailPage: React.FC = () => {
         userEmail={userEmail}
         actions={
           <>
-            <Button variant="secondary" onClick={() => navigate('/projects')}>
+            <Button variant="secondary" onClick={() => navigate("/projects")}>
               ← Back
             </Button>
             <Button onClick={() => setShowNewCorpusModal(true)}>
@@ -276,7 +281,8 @@ export const ProjectDetailPage: React.FC = () => {
               <div key={corpus.id} className="corpus-column">
                 <div className="corpus-column-inner">
                   <div className="corpus-facts">
-                    {(!factsByCorpus[corpus.id] || factsByCorpus[corpus.id].length === 0) ? (
+                    {!factsByCorpus[corpus.id] ||
+                    factsByCorpus[corpus.id].length === 0 ? (
                       <div className="empty-corpus">
                         <p>No facts yet</p>
                       </div>
@@ -307,25 +313,13 @@ export const ProjectDetailPage: React.FC = () => {
         )}
       </main>
 
-      <footer className="page-footer">
-        <div className="llm-chat-container">
-          <input
-            ref={llmInputRef}
-            type="text"
-            className="llm-chat-input"
-            placeholder="Chat with LLM... (Press 'l' to focus, 'k' for voice)"
-            value={llmInput}
-            onChange={(e) => setLlmInput(e.target.value)}
-          />
-          <button
-            className={`voice-button ${isListening ? 'listening' : ''}`}
-            onClick={toggleListening}
-            title={isListening ? 'Stop listening (or wait 2s)' : 'Start voice input (or press k)'}
-          >
-            🎤
-          </button>
-        </div>
-      </footer>
+      <PageFooter
+        llmInput={llmInput}
+        onLlmInputChange={setLlmInput}
+        isListening={isListening}
+        onToggleListening={toggleListening}
+        llmInputRef={llmInputRef}
+      />
 
       <Modal
         isOpen={showNewCorpusModal}
@@ -344,7 +338,7 @@ export const ProjectDetailPage: React.FC = () => {
           />
           <div className="modal-actions">
             <Button type="submit" disabled={creating}>
-              {creating ? 'Creating...' : 'Create Corpus'}
+              {creating ? "Creating..." : "Create Corpus"}
             </Button>
             <Button
               variant="secondary"

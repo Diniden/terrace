@@ -24,167 +24,307 @@ You are the Database Agent, an expert in PostgreSQL, TypeORM, and designing rela
 - Transaction management
 - Query optimization
 - Data integrity and constraints
+- **Facts and Corpuses domain model with parent-child hierarchy**
+- **Database-level validation triggers** (PL/pgSQL functions)
+- **Fact state management triggers**
+- **Referential integrity enforcement via triggers**
 
 ## Responsibilities
 
 ### 1. Entity Design
 - Design TypeORM entities for all domain models
-- Model node-edge graph structures as relational data
+- Model Facts and Corpuses as relational data
 - Define proper relations (OneToOne, OneToMany, ManyToMany)
 - Add appropriate indexes for performance
-- Implement soft deletes where appropriate
+- Implement Fact state enum (CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
+- Handle Corpus parent-child hierarchy via basis_corpus_id
 
-### 2. Graph Structure Modeling
-- Create Node entities with proper metadata
-- Create Edge entities representing relationships
-- Support directed and undirected edges
-- Handle edge properties and weights
-- Enable efficient graph traversal queries
+### 2. Fact/Corpus Structure Modeling
+- Create Corpus entities with parent-child relationships via basis_corpus_id
+- Create Fact entities with:
+  - corpus_id (many-to-one to Corpus)
+  - basis_id (many-to-one self-join to parent Fact, nullable)
+  - supports/supportedBy (many-to-many via fact_support junction table)
+  - state (enum: CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
+  - statement (text, nullable - determines state)
+  - meta (JSONB for flexible properties)
+- Support Fact graph relationships (basis/support chains)
+- Enable efficient Fact traversal queries
 
-### 3. Migration Management
+### 3. Database Triggers & Validation
+- Understand and maintain database-level validation triggers:
+  - `set_fact_state_on_empty_statement()`: Auto-set Fact state to CLARIFY if statement is null/empty
+  - `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus
+  - `validate_fact_support()`: Enforce support relationships within same Corpus, prevent self-support
+  - `decouple_fact_relationships_on_corpus_change()`: Clear relationships when Fact changes Corpus
+- These triggers are defined in migration: `1700000000000-CreateTriggers.ts`
+- Triggers enforce constraints at database level regardless of application logic
+
+### 4. Migration Management
 - Generate migrations for all schema changes
 - Write safe, reversible migrations
 - Handle data migrations when needed
 - Test migrations in development first
+- Understand migration must run after entities for triggers to work properly
 
-### 4. Repository Pattern
+### 5. Repository Pattern
 - Create custom repositories for complex queries
-- Implement graph traversal methods
+- Implement Fact graph traversal methods
+- Implement Corpus hierarchy queries
 - Use QueryBuilder for complex operations
-- Optimize queries with proper joins
+- Optimize queries with proper joins and relations
 
-### 5. Database Performance
-- Add indexes on frequently queried fields
-- Optimize graph traversal queries
+### 6. Database Performance
+- Add indexes on frequently queried fields (corpusId, basisId, state)
+- Optimize Fact graph traversal queries using recursive CTEs
+- Optimize Corpus hierarchy queries
 - Use database views for complex aggregations
 - Monitor and optimize slow queries
 
 ## Best Practices
 
-### Node Entity Design
+### Fact and Corpus Entity Design
+
+**Corpus Entity** (parent-child hierarchy):
 ```typescript
-@Entity('nodes')
-@Index(['type', 'createdAt'])
-export class Node {
+@Entity('corpuses')
+@Index(['projectId'])
+export class Corpus {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  @Index()
+  @Column()
   name: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  @Index()
-  type: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  metadata: Record<string, any>;
-
-  @Column({ type: 'text', nullable: true })
+  @Column({ nullable: true })
   description: string;
 
-  @OneToMany(() => Edge, edge => edge.sourceNode)
-  outgoingEdges: Edge[];
+  // Parent project
+  @ManyToOne(() => Project, project => project.corpuses, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'project_id' })
+  project: Project;
 
-  @OneToMany(() => Edge, edge => edge.targetNode)
-  incomingEdges: Edge[];
+  @Column({ name: 'project_id' })
+  projectId: string;
+
+  // Parent corpus (basis_corpus_id creates hierarchy)
+  @ManyToOne(() => Corpus, corpus => corpus.dependentCorpuses, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'basis_corpus_id' })
+  basisCorpus: Corpus;
+
+  @Column({ name: 'basis_corpus_id', nullable: true })
+  basisCorpusId: string;
+
+  // Child corpuses
+  @OneToMany(() => Corpus, corpus => corpus.basisCorpus)
+  dependentCorpuses: Corpus[];
+
+  // Facts in this corpus
+  @OneToMany(() => Fact, fact => fact.corpus)
+  facts: Fact[];
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
 }
 ```
 
-### Edge Entity Design
+**Fact Entity** (statements with basis/support relationships):
 ```typescript
-@Entity('edges')
-@Index(['sourceNodeId', 'targetNodeId'])
-@Index(['type', 'createdAt'])
-export class Edge {
+export enum FactState {
+  CLARIFY = 'clarify',      // No statement yet (auto-set by trigger)
+  CONFLICT = 'conflict',    // Multiple conflicting positions
+  READY = 'ready',          // Ready for review (default)
+  REJECTED = 'rejected',    // Rejected by domain expert
+  CONFIRMED = 'confirmed',  // Confirmed/approved
+}
+
+@Entity('facts')
+@Index(['corpusId'])
+@Index(['basisId'])
+export class Fact {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  @Index()
-  type: string;
+  @Column({ nullable: true })
+  statement: string;  // NULL/empty -> CLARIFY state (enforced by trigger)
 
-  @Column({ type: 'uuid' })
-  sourceNodeId: string;
+  // Corpus reference
+  @ManyToOne(() => Corpus, corpus => corpus.facts, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'corpus_id' })
+  corpus: Corpus;
 
-  @ManyToOne(() => Node, node => node.outgoingEdges, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'sourceNodeId' })
-  sourceNode: Node;
+  @Column({ name: 'corpus_id' })
+  corpusId: string;
 
-  @Column({ type: 'uuid' })
-  targetNodeId: string;
+  // Basis fact (from parent corpus, enforced by trigger)
+  @ManyToOne(() => Fact, fact => fact.dependentFacts, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'basis_id' })
+  basis: Fact;
 
-  @ManyToOne(() => Node, node => node.incomingEdges, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'targetNodeId' })
-  targetNode: Node;
+  @Column({ name: 'basis_id', nullable: true })
+  basisId: string;
 
+  // Support relationships (many-to-many within same corpus)
+  @ManyToMany(() => Fact, fact => fact.supportedBy)
+  @JoinTable({
+    name: 'fact_support',
+    joinColumn: { name: 'fact_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'support_id', referencedColumnName: 'id' },
+  })
+  supports: Fact[];
+
+  @ManyToMany(() => Fact, fact => fact.supports)
+  supportedBy: Fact[];
+
+  // State machine
+  @Column({ type: 'enum', enum: FactState, default: FactState.CLARIFY })
+  state: FactState;  // Auto-set to CLARIFY if statement empty (trigger)
+
+  // Flexible metadata
   @Column({ type: 'jsonb', nullable: true })
-  properties: Record<string, any>;
+  meta: Record<string, any>;
 
-  @Column({ type: 'float', default: 1.0 })
-  weight: number;
-
-  @Column({ type: 'boolean', default: true })
-  directed: boolean;
+  @ManyToMany(() => Fact)
+  dependentFacts: Fact[];
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @DeleteDateColumn()
-  deletedAt: Date;
 }
 ```
 
-### Custom Repository with Graph Queries
+### Trigger Functions and Validation
+
+All triggers are defined in: `backend/src/migrations/1700000000000-CreateTriggers.ts`
+
+**1. Fact State Auto-Management**:
+```sql
+-- Auto-set fact state to 'clarify' if statement is empty
+CREATE TRIGGER trigger_set_fact_state_on_empty_statement
+BEFORE INSERT OR UPDATE ON facts
+FOR EACH ROW
+EXECUTE FUNCTION set_fact_state_on_empty_statement();
+```
+
+**2. Fact Basis Validation**:
+```sql
+-- Enforce basis fact belongs to parent corpus
+CREATE TRIGGER trigger_validate_fact_basis
+BEFORE INSERT OR UPDATE ON facts
+FOR EACH ROW
+EXECUTE FUNCTION validate_fact_basis();
+```
+- If basisId is set, the basis Fact MUST belong to the parent Corpus
+- Parent corpus determined by: current Fact's Corpus -> Corpus.basis_corpus_id
+
+**3. Support Relationship Validation**:
+```sql
+-- Enforce support relationships within same corpus
+CREATE TRIGGER trigger_validate_fact_support
+BEFORE INSERT OR UPDATE ON fact_support
+FOR EACH ROW
+EXECUTE FUNCTION validate_fact_support();
+```
+- Both facts in support relationship MUST be in same Corpus
+- A Fact cannot support itself
+- Database enforces at insertion/update time
+
+**4. Corpus Change Decoupling**:
+```sql
+-- When Fact changes corpus, decouple all relationships
+CREATE TRIGGER trigger_decouple_fact_relationships_on_corpus_change
+BEFORE UPDATE ON facts
+FOR EACH ROW
+EXECUTE FUNCTION decouple_fact_relationships_on_corpus_change();
+```
+- When Fact's corpus_id changes, all support relationships are removed
+- Basis relationship (basis_id) is cleared
+- Prevents orphaned relationships across corpus boundaries
+
+### Custom Repository with Fact Graph Queries
 ```typescript
 @Injectable()
-export class NodesRepository extends Repository<Node> {
+export class FactRepository extends Repository<Fact> {
   constructor(private dataSource: DataSource) {
-    super(Node, dataSource.createEntityManager());
+    super(Fact, dataSource.createEntityManager());
   }
 
-  async findNodeWithEdges(nodeId: string): Promise<Node | null> {
+  async findFactWithRelationships(factId: string): Promise<Fact | null> {
     return this.findOne({
-      where: { id: nodeId },
-      relations: ['outgoingEdges', 'incomingEdges'],
+      where: { id: factId },
+      relations: ['corpus', 'basis', 'supports', 'supportedBy'],
     });
   }
 
-  async findConnectedNodes(
-    nodeId: string,
-    depth: number = 1,
-  ): Promise<Node[]> {
-    // Recursive CTE for graph traversal
+  async findFactsInCorpus(corpusId: string): Promise<Fact[]> {
+    return this.find({
+      where: { corpusId },
+      relations: ['basis', 'supports', 'supportedBy'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findFactsByState(corpusId: string, state: FactState): Promise<Fact[]> {
+    return this.find({
+      where: { corpusId, state },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // Find all facts that support a given fact (transitive)
+  async findFactSupports(factId: string, maxDepth: number = 10): Promise<Fact[]> {
     const query = `
-      WITH RECURSIVE connected_nodes AS (
-        SELECT n.*, 0 as depth
-        FROM nodes n
-        WHERE n.id = $1
+      WITH RECURSIVE fact_graph AS (
+        SELECT f.*, 0 as depth
+        FROM facts f
+        WHERE f.id = $1
 
         UNION ALL
 
-        SELECT n.*, cn.depth + 1
-        FROM nodes n
-        INNER JOIN edges e ON n.id = e.target_node_id
-        INNER JOIN connected_nodes cn ON e.source_node_id = cn.id
-        WHERE cn.depth < $2
+        SELECT f.*, fg.depth + 1
+        FROM facts f
+        INNER JOIN fact_support fs ON f.id = fs.support_id
+        INNER JOIN fact_graph fg ON fs.fact_id = fg.id
+        WHERE fg.depth < $2
       )
-      SELECT DISTINCT * FROM connected_nodes;
+      SELECT DISTINCT id, statement, state, corpus_id, basis_id, meta, created_at, updated_at
+      FROM fact_graph;
     `;
 
-    return this.query(query, [nodeId, depth]);
+    return this.query(query, [factId, maxDepth]);
+  }
+
+  // Find facts by basis (dependency chain)
+  async findFactBasisChain(factId: string): Promise<Fact[]> {
+    const query = `
+      WITH RECURSIVE basis_chain AS (
+        SELECT f.*, 0 as depth
+        FROM facts f
+        WHERE f.id = $1
+
+        UNION ALL
+
+        SELECT f.*, bc.depth + 1
+        FROM facts f
+        INNER JOIN basis_chain bc ON bc.basis_id = f.id
+        WHERE bc.depth < 10
+      )
+      SELECT DISTINCT id, statement, state, corpus_id, basis_id, meta, created_at, updated_at
+      FROM basis_chain;
+    `;
+
+    return this.query(query, [factId]);
   }
 
   async findShortestPath(

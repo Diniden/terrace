@@ -16,5 +16,7 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-  migrationsRun: true,
+  // Run migrations after synchronize in development
+  // In production, set synchronize to false and migrationsRun to true
+  migrationsRun: process.env.NODE_ENV !== 'development',
 };

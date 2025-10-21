@@ -129,8 +129,17 @@ async function createCorpusChain(
       previousCorpusId
     );
 
-    const factCount = await createFacts(corpus.id, factsPerCorpus);
-    console.log(`${indent}✅ Created "${corpus.name}" with ${factCount} facts`);
+    const factIds = await createFacts(corpus.id, factsPerCorpus);
+
+    // Assign basis facts from parent corpus if it exists
+    if (corpus.basisCorpusId) {
+      await assignBasisFacts(factIds, corpus.basisCorpusId);
+    }
+
+    // Assign sibling facts (2-10 from the same corpus)
+    await assignSiblingFacts(factIds);
+
+    console.log(`${indent}✅ Created "${corpus.name}" with ${factIds.length} facts`);
 
     previousCorpusId = corpus.id;
   }
@@ -151,7 +160,7 @@ async function createCorpus(
   return result[0];
 }
 
-async function createFacts(corpusId: string, count: number): Promise<number> {
+async function createFacts(corpusId: string, count: number): Promise<string[]> {
   const factStatements = [
     'The sky is blue during the day',
     'Water boils at 100°C at sea level',
@@ -176,18 +185,73 @@ async function createFacts(corpusId: string, count: number): Promise<number> {
   ];
 
   const states = ['clarify', 'conflict', 'ready', 'confirmed', 'rejected'];
+  const factIds: string[] = [];
 
   for (let i = 0; i < count; i++) {
     const statement = factStatements[i % factStatements.length];
     const state = states[i % states.length];
 
-    await dataSource.query(
-      `INSERT INTO facts (corpus_id, statement, state) VALUES ($1, $2, $3)`,
+    const result = await dataSource.query(
+      `INSERT INTO facts (corpus_id, statement, state) VALUES ($1, $2, $3) RETURNING id`,
       [corpusId, `${statement} (Fact ${i + 1})`, state]
     );
+    factIds.push(result[0].id);
   }
 
-  return count;
+  return factIds;
+}
+
+async function assignBasisFacts(
+  factIds: string[],
+  parentCorpusId: string
+): Promise<void> {
+  // Get all facts from the parent corpus
+  const parentFacts = await dataSource.query(
+    `SELECT id FROM facts WHERE corpus_id = $1`,
+    [parentCorpusId]
+  );
+
+  if (parentFacts.length === 0) {
+    return; // No parent facts to assign
+  }
+
+  // Assign a random basis fact from parent corpus to each fact
+  for (const factId of factIds) {
+    const randomBasisFact =
+      parentFacts[Math.floor(Math.random() * parentFacts.length)];
+
+    await dataSource.query(
+      `UPDATE facts SET basis_id = $1 WHERE id = $2`,
+      [randomBasisFact.id, factId]
+    );
+  }
+}
+
+async function assignSiblingFacts(factIds: string[]): Promise<void> {
+  if (factIds.length < 2) {
+    return; // Need at least 2 facts to create siblings
+  }
+
+  for (const factId of factIds) {
+    // Pick 2-10 random sibling facts (excluding the fact itself)
+    const siblingCount = Math.floor(Math.random() * 9) + 2; // 2 to 10
+    const otherFactIds = factIds.filter((id) => id !== factId);
+
+    // Shuffle and take the first siblingCount facts
+    const shuffled = otherFactIds.sort(() => 0.5 - Math.random());
+    const selectedSiblings = shuffled.slice(
+      0,
+      Math.min(siblingCount, otherFactIds.length)
+    );
+
+    // Create fact_support relationships
+    for (const siblingId of selectedSiblings) {
+      await dataSource.query(
+        `INSERT INTO fact_support (fact_id, support_id) VALUES ($1, $2)`,
+        [factId, siblingId]
+      );
+    }
+  }
 }
 
 seedData();

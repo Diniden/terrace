@@ -23,9 +23,31 @@ This project uses a multi-agent system where specialized Claude agents handle di
 - **Runtime**: Bun (for scripts and package management)
 - **Process Manager**: mprocs (backend and frontend run concurrently)
 - **E2E Testing**: Playwright with MCP browser access
-- **Graph Models**: Node-edge graph structures are core to the business logic
+- **Graph Models**: Facts/Corpuses domain model with parent-child corpus hierarchy
 
-### 4. Code Quality Standards
+### 4. Domain Model: Facts and Corpuses
+**Corpuses**: Collections of Facts grouped within Projects
+- Each Corpus belongs to exactly one Project
+- Corpuses form a parent-child hierarchy via `basis_corpus_id`
+- When creating a new Corpus, it auto-assigns as child of last Corpus in project (if exists)
+
+**Facts**: Statements contained within Corpuses
+- Each Fact belongs to exactly one Corpus (`corpus_id`)
+- Facts have optional basis Fact from parent Corpus (`basis_id`)
+- Facts can support other Facts in same Corpus via `fact_support` junction table
+- Facts have a state machine: CLARIFY (no statement), CONFLICT, READY, REJECTED, CONFIRMED
+- Auto-transitions to CLARIFY when statement is empty or null
+- Flexible metadata stored as JSONB (`meta` column)
+
+**Database Validation Triggers** (defined in migration 1700000000000-CreateTriggers.ts):
+- `set_fact_state_on_empty_statement()`: Auto-set Fact state to CLARIFY if statement null/empty
+- `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus
+- `validate_fact_support()`: Enforce support relationships within same Corpus, prevent self-support
+- `decouple_fact_relationships_on_corpus_change()`: Clear relationships when Fact changes Corpus
+
+These constraints are enforced at database level and must be respected in application logic.
+
+### 5. Code Quality Standards
 - Use TypeScript strict mode
 - Follow functional programming principles where appropriate
 - Prefer composition over inheritance
@@ -33,18 +55,26 @@ This project uses a multi-agent system where specialized Claude agents handle di
 - Add JSDoc comments for public APIs and complex logic
 - Use async/await over Promise chains
 - Handle errors explicitly - no silent failures
+- Respect database-level validation constraints (triggers) in application logic
+- Validate Fact basis belongs to parent Corpus before database operations
+- Validate support relationships within same Corpus before database operations
 
-### 5. File Organization
+### 6. File Organization
 ```
 terrace/
 ├── backend/          # NestJS API (REST API Agent, DB Agent, Business Logic Agent)
+│   ├── src/
+│   │   ├── modules/fact/       # Fact CRUD operations
+│   │   ├── modules/corpus/     # Corpus CRUD operations
+│   │   └── entities/           # TypeORM entities (Fact, Corpus, etc.)
+│   │   └── migrations/         # Database migrations including triggers
 ├── frontend/         # React UI (Frontend Architect Agent)
 ├── scripts/          # Bun scripts (DevOps Agent)
 ├── docs/             # Documentation (Project Manager Agent)
-└── .claude/agents/   # Agent definitions
+└── .claude/agents/   # Agent definitions (specialized sub-agents)
 ```
 
-### 6. Testing Requirements
+### 7. Testing Requirements
 
 **Development Environment**:
 - Server is ALWAYS assumed to be running via `bun run dev` (mprocs)
@@ -56,7 +86,7 @@ terrace/
 - **Unit Tests**: Write for business logic, services, and utilities
 - **Integration Tests**: Write for API endpoints (test against running server)
 - **E2E Tests**: Use Playwright with MCP browser access
-- **Graph Tests**: Test graph operations thoroughly
+- **Fact/Corpus Tests**: Test state machine transitions, relationships
 - Mock external dependencies only (not internal services)
 
 **E2E Testing with Playwright**:
@@ -65,33 +95,53 @@ terrace/
 - Use `bun run test:e2e` for headless tests
 - Use `bun run test:e2e:ui` for interactive UI mode
 - Tests validate full user flows and API integration
+- Test Fact creation, state transitions, and relationship management
 
-### 7. Database & ORM Guidelines
-- All graph data MUST use proper relational models
-- Nodes and edges should have dedicated tables
-- Use TypeORM decorators properly
+### 8. Database & ORM Guidelines
+- All Fact/Corpus data MUST use proper relational models via TypeORM
+- Facts and Corpuses should have dedicated tables with proper relationships
+- Use TypeORM decorators properly (ManyToOne, OneToMany, ManyToMany)
 - Include migrations for all schema changes
-- Index graph traversal fields appropriately
+- Index frequently queried fields (corpusId, basisId, state, projectId)
+- Database triggers enforce validation (see migration 1700000000000-CreateTriggers.ts)
+- Understand trigger constraints before writing business logic
 
-### 8. API Design
+### 9. API Design
 - Follow RESTful conventions
 - Use proper HTTP status codes
 - Validate input with class-validator
 - Return consistent error formats
 - Version APIs when breaking changes occur
+- **Fact/Corpus Endpoints**:
+  - `GET /facts` - List facts (paginated, filterable)
+  - `POST /facts` - Create fact (validates basis/corpus)
+  - `PATCH /facts/:id` - Update fact (validates basis/support)
+  - `DELETE /facts/:id` - Delete fact
+  - `POST /facts/:id/support` - Add support relationship
+  - `DELETE /facts/:id/support/:supportFactId` - Remove support
+  - `GET /corpuses` - List corpuses
+  - `POST /corpuses` - Create corpus (auto-assigns parent)
+  - `PATCH /corpuses/:id` - Update corpus
+  - `DELETE /corpuses/:id` - Delete corpus
 
-### 9. React & Frontend
+### 10. React & Frontend
 - Use functional components with hooks
 - Implement proper error boundaries
 - Use TypeScript interfaces for all props
 - Keep components small and focused
 - Separate business logic from presentation
+- **Display Fact state**: Use FactState enum values (CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
+- **Show Fact relationships**: Display basis fact and support facts
+- **Handle Corpus hierarchy**: Show parent/child relationships
 
-### 10. Documentation
+### 11. Documentation
 - Update README.md files when changing project structure
 - Document all environment variables
 - Maintain API documentation
 - Keep agent responsibilities documented
+- **Document Fact/Corpus model** in architecture docs
+- **Document database triggers** and their constraints
+- **Document state machine** for Facts
 
 ## Agent Interaction Protocol
 
@@ -152,12 +202,24 @@ All agents working with backend code MUST:
 ## Required Actions
 - ✅ Keep .cursorrules synchronized with code
 - ✅ Write TypeScript with strict typing
-- ✅ Test graph operations thoroughly
+- ✅ Test Fact/Corpus operations thoroughly
+- ✅ Test state machine transitions
+- ✅ Test relationship constraints (basis, support)
 - ✅ Document public APIs
 - ✅ Follow the DRY principle
 - ✅ Use semantic naming
 - ✅ Handle errors gracefully
 - ✅ Be a NestJS expert (for backend agents)
+- ✅ Understand database triggers and constraints
+- ✅ Validate Fact/Corpus relationships before database operations
 - ✅ Assume servers are running when testing
 - ✅ Create git commits with concise summaries (1-5 sentences)
 - ✅ Avoid writing summary files to save tokens
+
+## Key Domain Concepts
+- **Fact**: Statement with state machine, optional basis from parent Corpus, can support other Facts
+- **Corpus**: Collection of Facts with optional parent Corpus, belongs to Project
+- **State**: CLARIFY (no statement), CONFLICT, READY, REJECTED, CONFIRMED
+- **Basis**: Optional parent Fact from parent Corpus (validates via trigger)
+- **Support**: Many-to-many relationships between Facts in same Corpus (validates via trigger)
+- **Trigger**: Database-level constraint enforcement (4 triggers defined in migration)

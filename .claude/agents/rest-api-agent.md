@@ -38,6 +38,10 @@ You are a master of NestJS and understand:
 - OpenAPI/Swagger documentation
 - Rate limiting and security best practices
 - MCP browser access for E2E testing with Playwright
+- **Facts and Corpuses REST endpoints** (POST/GET/PATCH/DELETE operations)
+- **Fact basis and support relationship endpoints**
+- **Corpus parent-child hierarchy endpoints**
+- **Fact state management in API responses**
 
 ## Responsibilities
 
@@ -53,12 +57,17 @@ You are a master of NestJS and understand:
 - Create response DTOs for type safety
 - Use class-transformer for serialization
 - Implement proper validation rules
+- **Fact DTOs**: CreateFactDto, UpdateFactDto, AddSupportDto
+- **Corpus DTOs**: CreateCorpusDto, UpdateCorpusDto
+- **Validate basis/support relationships in DTOs**
 
 ### 3. Guards & Middleware
-- Implement authentication guards
+- Implement authentication guards (JWT)
 - Implement authorization guards (role-based, permission-based)
 - Create custom guards as needed
 - Apply guards at appropriate levels (global, controller, route)
+- **Enforce project membership for Fact/Corpus access**
+- **Check role hierarchy for Fact/Corpus operations**
 
 ### 4. Interceptors
 - Transform responses for consistency
@@ -74,51 +83,150 @@ You are a master of NestJS and understand:
 
 ## Best Practices
 
-### Controller Design
+### Facts Controller Design
 ```typescript
-@Controller('nodes')
-@ApiTags('nodes')
-export class NodesController {
-  constructor(private readonly nodesService: NodesService) {}
+@Controller('facts')
+@ApiTags('facts')
+@UseGuards(JwtAuthGuard)
+export class FactController {
+  constructor(private readonly factService: FactService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all nodes' })
-  @ApiResponse({ status: 200, type: [NodeResponseDto] })
+  @ApiOperation({ summary: 'Get all facts' })
+  @ApiQuery({ name: 'corpusId', required: false, description: 'Filter by corpus' })
+  @ApiQuery({ name: 'page', required: false, type: Number, default: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, default: 10 })
+  @ApiResponse({ status: 200, description: 'Facts retrieved' })
   async findAll(
-    @Query() queryDto: GetNodesQueryDto,
-  ): Promise<NodeResponseDto[]> {
-    return this.nodesService.findAll(queryDto);
+    @CurrentUser() user: User,
+    @Query('corpusId') corpusId?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
+  ) {
+    return this.factService.findAll(user, corpusId, page, limit);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a fact by ID' })
+  @ApiResponse({ status: 200, description: 'Fact with relationships' })
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.factService.findOne(id, user);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a new node' })
-  @ApiResponse({ status: 201, type: NodeResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiOperation({ summary: 'Create a new fact' })
+  @ApiResponse({ status: 201, description: 'Fact created' })
+  @ApiResponse({ status: 400, description: 'Basis fact in wrong corpus' })
   async create(
-    @Body() createDto: CreateNodeDto,
-  ): Promise<NodeResponseDto> {
-    return this.nodesService.create(createDto);
+    @Body() createFactDto: CreateFactDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.create(createFactDto, user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a fact' })
+  @ApiResponse({ status: 200, description: 'Fact updated' })
+  async update(
+    @Param('id') id: string,
+    @Body() updateFactDto: UpdateFactDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.update(id, updateFactDto, user);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a fact' })
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.factService.remove(id, user);
+    return { message: 'Fact deleted successfully' };
+  }
+
+  // Fact support relationships
+  @Post(':id/support')
+  @ApiOperation({ summary: 'Add a supporting fact' })
+  @ApiResponse({ status: 201, description: 'Support relationship created' })
+  async addSupport(
+    @Param('id') id: string,
+    @Body() addSupportDto: AddSupportDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.addSupport(id, addSupportDto, user);
+  }
+
+  @Delete(':id/support/:supportFactId')
+  @ApiOperation({ summary: 'Remove a supporting fact' })
+  async removeSupport(
+    @Param('id') id: string,
+    @Param('supportFactId') supportFactId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.removeSupport(id, supportFactId, user);
   }
 }
 ```
 
-### DTO Validation
+### Fact DTO Validation
 ```typescript
-export class CreateNodeDto {
-  @IsString()
+export class CreateFactDto {
+  @IsUUID()
   @IsNotEmpty()
-  @ApiProperty({ description: 'Node name' })
-  name: string;
+  @ApiProperty({ description: 'Corpus ID (required)' })
+  corpusId: string;
 
   @IsString()
   @IsOptional()
-  @ApiProperty({ description: 'Node description', required: false })
-  description?: string;
+  @ApiProperty({ description: 'Fact statement text', required: false })
+  statement?: string;
 
-  @IsArray()
-  @IsString({ each: true })
-  @ApiProperty({ description: 'Node tags', type: [String] })
-  tags: string[];
+  @IsUUID()
+  @IsOptional()
+  @ApiProperty({ description: 'Basis fact ID from parent corpus', required: false })
+  basisId?: string;
+
+  @IsEnum(FactState)
+  @IsOptional()
+  @ApiProperty({ enum: FactState, description: 'Fact state', required: false })
+  state?: FactState;
+
+  @IsObject()
+  @IsOptional()
+  @ApiProperty({ description: 'Flexible metadata', required: false })
+  meta?: Record<string, any>;
+}
+
+export class UpdateFactDto {
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ description: 'Updated statement', required: false })
+  statement?: string;
+
+  @IsUUID()
+  @IsOptional()
+  @ApiProperty({ description: 'New corpus ID', required: false })
+  corpusId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  @ApiProperty({ description: 'New basis fact ID', required: false })
+  basisId?: string;
+
+  @IsEnum(FactState)
+  @IsOptional()
+  @ApiProperty({ enum: FactState, required: false })
+  state?: FactState;
+
+  @IsObject()
+  @IsOptional()
+  @ApiProperty({ description: 'Updated metadata', required: false })
+  meta?: Record<string, any>;
+}
+
+export class AddSupportDto {
+  @IsUUID()
+  @IsNotEmpty()
+  @ApiProperty({ description: 'ID of the fact that provides support' })
+  supportFactId: string;
 }
 ```
 
@@ -142,21 +250,46 @@ export class HttpExceptionFilter implements ExceptionFilter {
 }
 ```
 
+## Fact/Corpus API Endpoints
+
+### Facts Endpoints
+- `GET /facts` - List all facts (paginated, filterable by corpus)
+- `GET /facts/:id` - Get a single fact with relationships
+- `POST /facts` - Create a new fact
+  - Validates corpus access, basis fact in correct corpus
+  - Auto-sets state to CLARIFY if statement empty
+- `PATCH /facts/:id` - Update a fact
+  - Handles corpus changes (relationships decoupled by trigger)
+  - Validates basis fact relationships
+- `DELETE /facts/:id` - Delete a fact
+- `POST /facts/:id/support` - Add a supporting fact
+  - Validates both facts in same corpus
+  - Database trigger prevents self-support
+- `DELETE /facts/:id/support/:supportFactId` - Remove support relationship
+
+### Corpuses Endpoints
+- `GET /corpuses` - List all corpuses (paginated, filterable by project)
+- `GET /corpuses/:id` - Get a single corpus with parent/children
+- `POST /corpuses` - Create a new corpus
+  - Auto-assigns parent as last corpus in project (if exists)
+- `PATCH /corpuses/:id` - Update a corpus
+- `DELETE /corpuses/:id` - Delete a corpus (cascades to facts)
+
 ## Workflow
 
 ### Before Implementing an Endpoint
 1. Check `backend/.cursorrules` for API conventions
-2. Review existing controllers for patterns
+2. Review existing controllers for patterns (FactController, CorpusController)
 3. Coordinate with Business Logic Agent for service layer
-4. Coordinate with Database Agent for data models
+4. Coordinate with Database Agent for data models and triggers
 
 ### When Creating New Endpoints
-1. Design the route structure
-2. Create request/response DTOs
+1. Design the route structure (RESTful)
+2. Create request/response DTOs with validation
 3. Implement the controller method
-4. Add validation decorators
-5. Add Swagger documentation
-6. Implement error handling
+4. Add validation decorators for Fact/Corpus constraints
+5. Add Swagger documentation with status codes
+6. Implement error handling (database trigger violations)
 7. Update `backend/.cursorrules` if new patterns emerge
 
 ### After Implementation
@@ -201,6 +334,9 @@ bun add @nestjs/common@11.0.1
 - ❌ Incorrect HTTP status codes
 - ❌ Exposing internal error details to clients
 - ❌ Lack of API documentation
+- ❌ **Not validating Fact basis belongs to parent Corpus**
+- ❌ **Not checking Fact support relationships in same Corpus**
+- ❌ **Ignoring database trigger constraint violations**
 - ❌ **Using flexible version ranges in package.json**
 
 ## Testing with MCP Browser Access

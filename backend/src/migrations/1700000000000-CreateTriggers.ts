@@ -8,7 +8,7 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       RETURNS TRIGGER AS $$
       BEGIN
         IF NEW.statement IS NULL OR NEW.statement = '' THEN
-          NEW.state = 'incomplete';
+          NEW.state = 'clarify';
         END IF;
         RETURN NEW;
       END;
@@ -22,9 +22,9 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       BEGIN
         IF OLD.corpus_id IS DISTINCT FROM NEW.corpus_id THEN
           -- Remove support relationships where this fact supports others
-          DELETE FROM fact_support WHERE supporting_fact_id = NEW.id;
+          DELETE FROM fact_support WHERE fact_id = NEW.id;
           -- Remove support relationships where this fact is supported
-          DELETE FROM fact_support WHERE supported_fact_id = NEW.id;
+          DELETE FROM fact_support WHERE support_id = NEW.id;
           -- Clear basis
           NEW.basis_id = NULL;
         END IF;
@@ -37,15 +37,22 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION validate_fact_basis()
       RETURNS TRIGGER AS $$
+      DECLARE
+        parent_corpus_id UUID;
       BEGIN
         IF NEW.basis_id IS NOT NULL THEN
-          -- Check if basis fact exists and belongs to same corpus
+          -- Get the parent corpus_id for the current fact's corpus
+          SELECT basis_corpus_id INTO parent_corpus_id
+          FROM corpuses
+          WHERE id = NEW.corpus_id;
+
+          -- Check if basis fact exists and belongs to parent corpus
           IF NOT EXISTS (
             SELECT 1 FROM facts
             WHERE id = NEW.basis_id
-            AND corpus_id = NEW.corpus_id
+            AND corpus_id = parent_corpus_id
           ) THEN
-            RAISE EXCEPTION 'Basis fact must belong to the same corpus';
+            RAISE EXCEPTION 'Basis fact must belong to the parent corpus';
           END IF;
         END IF;
         RETURN NEW;
@@ -63,10 +70,10 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       BEGIN
         -- Get corpus_id for both facts
         SELECT corpus_id INTO supporting_corpus_id
-        FROM facts WHERE id = NEW.supporting_fact_id;
+        FROM facts WHERE id = NEW.fact_id;
 
         SELECT corpus_id INTO supported_corpus_id
-        FROM facts WHERE id = NEW.supported_fact_id;
+        FROM facts WHERE id = NEW.support_id;
 
         -- Validate same corpus
         IF supporting_corpus_id IS DISTINCT FROM supported_corpus_id THEN
@@ -74,7 +81,7 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
         END IF;
 
         -- Prevent self-support
-        IF NEW.supporting_fact_id = NEW.supported_fact_id THEN
+        IF NEW.fact_id = NEW.support_id THEN
           RAISE EXCEPTION 'A fact cannot support itself';
         END IF;
 
@@ -132,9 +139,7 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
     );
 
     // Drop functions
-    await queryRunner.query(
-      `DROP FUNCTION IF EXISTS validate_fact_support();`,
-    );
+    await queryRunner.query(`DROP FUNCTION IF EXISTS validate_fact_support();`);
     await queryRunner.query(`DROP FUNCTION IF EXISTS validate_fact_basis();`);
     await queryRunner.query(
       `DROP FUNCTION IF EXISTS decouple_fact_relationships_on_corpus_change();`,
