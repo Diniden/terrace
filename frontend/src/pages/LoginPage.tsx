@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/common/Button';
-import { Modal } from '../components/common/Modal';
-import { TextInput } from '../components/common/TextInput';
-import './LoginPage.css';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/common/Button";
+import { Modal } from "../components/common/Modal";
+import { TextInput } from "../components/common/TextInput";
+import "./LoginPage.css";
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showRegister, setShowRegister] = useState(false);
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { login, register } = useAuth();
@@ -21,14 +21,14 @@ export const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login({ email, password });
-      navigate('/projects');
+      navigate("/projects");
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -36,15 +36,15 @@ export const LoginPage: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (registerPassword !== registerConfirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (registerPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -53,9 +53,9 @@ export const LoginPage: React.FC = () => {
     try {
       await register({ email: registerEmail, password: registerPassword });
       setShowRegister(false);
-      navigate('/projects');
+      navigate("/projects");
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Facts Application</h1>
+        <h1>Terrace</h1>
         <form onSubmit={handleLogin}>
           <TextInput
             label="Email"
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
           />
           {error && <div className="error-message">{error}</div>}
           <Button type="submit" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </Button>
           <button
             type="button"
@@ -136,7 +136,7 @@ export const LoginPage: React.FC = () => {
           {error && <div className="error-message">{error}</div>}
           <div className="modal-actions">
             <Button type="submit" disabled={loading}>
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? "Creating Account..." : "Create Account"}
             </Button>
             <Button
               variant="secondary"

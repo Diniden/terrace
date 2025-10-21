@@ -18,3 +18,8 @@ procs:
     shell: "cd frontend && bun run storybook"
     env:
       NODE_ENV: development
+
+  scripts:
+    shell: "bun run scripts/run-script.ts"
+    env:
+      NODE_ENV: development

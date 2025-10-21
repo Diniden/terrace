@@ -8,6 +8,7 @@ import { UserModule } from './modules/user/user.module';
 import { ProjectModule } from './modules/project/project.module';
 import { CorpusModule } from './modules/corpus/corpus.module';
 import { FactModule } from './modules/fact/fact.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { FactModule } from './modules/fact/fact.module';
     ProjectModule,
     CorpusModule,
     FactModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

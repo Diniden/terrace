@@ -1,18 +1,18 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { fn } from '@storybook/test';
-import { FactCard } from './FactCard';
-import { Fact, FactState } from '../../types';
+import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
+import { FactCard } from "./FactCard";
+import { type Fact, FactState } from "../../types";
 
 const meta = {
-  title: 'Components/User/FactCard',
+  title: "Components/User/FactCard",
   component: FactCard,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     fact: {
-      description: 'The fact object to display',
+      description: "The fact object to display",
     },
   },
   args: {
@@ -25,8 +25,8 @@ type Story = StoryObj<typeof meta>;
 
 // Helper to create a fact with all required fields
 const createFact = (overrides: Partial<Fact>): Fact => ({
-  id: '1',
-  corpusId: 'corpus-1',
+  id: "1",
+  corpusId: "corpus-1",
   state: FactState.READY,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -37,7 +37,7 @@ const createFact = (overrides: Partial<Fact>): Fact => ({
 export const Ready: Story = {
   args: {
     fact: createFact({
-      statement: 'This is a fact in ready state',
+      statement: "This is a fact in ready state",
       state: FactState.READY,
     }),
   },
@@ -47,7 +47,7 @@ export const Ready: Story = {
 export const Clarify: Story = {
   args: {
     fact: createFact({
-      statement: 'This fact needs clarification',
+      statement: "This fact needs clarification",
       state: FactState.CLARIFY,
     }),
   },
@@ -57,7 +57,7 @@ export const Clarify: Story = {
 export const Conflict: Story = {
   args: {
     fact: createFact({
-      statement: 'This fact has a conflict',
+      statement: "This fact has a conflict",
       state: FactState.CONFLICT,
     }),
   },
@@ -67,7 +67,7 @@ export const Conflict: Story = {
 export const Confirmed: Story = {
   args: {
     fact: createFact({
-      statement: 'This fact has been confirmed',
+      statement: "This fact has been confirmed",
       state: FactState.CONFIRMED,
     }),
   },
@@ -77,7 +77,7 @@ export const Confirmed: Story = {
 export const Rejected: Story = {
   args: {
     fact: createFact({
-      statement: 'This fact has been rejected',
+      statement: "This fact has been rejected",
       state: FactState.REJECTED,
     }),
   },
@@ -87,7 +87,7 @@ export const Rejected: Story = {
 export const EmptyStatement: Story = {
   args: {
     fact: createFact({
-      statement: '',
+      statement: "",
       state: FactState.READY,
     }),
   },
@@ -108,7 +108,7 @@ export const LongStatement: Story = {
   args: {
     fact: createFact({
       statement:
-        'This is a very long fact statement that demonstrates how the component handles overflow and wrapping of text content. It should display properly even with extensive content that might need multiple lines.',
+        "This is a very long fact statement that demonstrates how the component handles overflow and wrapping of text content. It should display properly even with extensive content that might need multiple lines.",
       state: FactState.READY,
     }),
   },
@@ -118,7 +118,7 @@ export const LongStatement: Story = {
 export const ShortStatement: Story = {
   args: {
     fact: createFact({
-      statement: 'Short',
+      statement: "Short",
       state: FactState.CONFIRMED,
     }),
   },
@@ -127,23 +127,31 @@ export const ShortStatement: Story = {
 // Multiple facts in different states (for visual comparison)
 export const AllStates: Story = {
   render: (args) => (
-    <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+    <div
+      style={{ display: "flex", gap: "var(--spacing-md)", flexWrap: "wrap" }}
+    >
       <FactCard
         {...args}
-        fact={createFact({ statement: 'Clarify', state: FactState.CLARIFY })}
+        fact={createFact({ statement: "Clarify", state: FactState.CLARIFY })}
       />
       <FactCard
         {...args}
-        fact={createFact({ statement: 'Conflict', state: FactState.CONFLICT })}
-      />
-      <FactCard {...args} fact={createFact({ statement: 'Ready', state: FactState.READY })} />
-      <FactCard
-        {...args}
-        fact={createFact({ statement: 'Rejected', state: FactState.REJECTED })}
+        fact={createFact({ statement: "Conflict", state: FactState.CONFLICT })}
       />
       <FactCard
         {...args}
-        fact={createFact({ statement: 'Confirmed', state: FactState.CONFIRMED })}
+        fact={createFact({ statement: "Ready", state: FactState.READY })}
+      />
+      <FactCard
+        {...args}
+        fact={createFact({ statement: "Rejected", state: FactState.REJECTED })}
+      />
+      <FactCard
+        {...args}
+        fact={createFact({
+          statement: "Confirmed",
+          state: FactState.CONFIRMED,
+        })}
       />
     </div>
   ),
@@ -156,10 +164,10 @@ export const AllStates: Story = {
 export const WithMetadata: Story = {
   args: {
     fact: createFact({
-      statement: 'Fact with metadata',
+      statement: "Fact with metadata",
       state: FactState.READY,
       meta: {
-        source: 'Document A',
+        source: "Document A",
         confidence: 0.95,
       },
     }),

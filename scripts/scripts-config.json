@@ -1,0 +1,12 @@
+{
+  "customScripts": {
+    "seed-data.ts": {
+      "description": "Seed test data for all users (small, medium, large projects)",
+      "category": "Database"
+    },
+    "clear-data.ts": {
+      "description": "Clear all data from database tables",
+      "category": "Database"
+    }
+  }
+}

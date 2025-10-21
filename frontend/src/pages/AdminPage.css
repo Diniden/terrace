@@ -1,0 +1,47 @@
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-grey-100);
+}
+
+.admin-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.admin-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-loading,
+.admin-unauthorized,
+.admin-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-grey-600);
+  font-size: var(--font-size-lg);
+}
+
+.admin-unauthorized {
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.admin-unauthorized h1 {
+  font-size: var(--font-size-xl);
+  color: var(--color-error);
+  margin: 0;
+}
+
+.admin-unauthorized p {
+  margin: 0;
+  color: var(--color-grey-600);
+}

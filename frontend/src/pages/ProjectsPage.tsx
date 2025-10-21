@@ -8,6 +8,7 @@ import { Spinner } from '../components/common/Spinner';
 import { Modal } from '../components/common/Modal';
 import { TextInput } from '../components/common/TextInput';
 import { TextArea } from '../components/common/TextArea';
+import { PageHeader } from '../components/common/PageHeader';
 import type { Project } from '../types';
 import './ProjectsPage.css';
 
@@ -20,7 +21,7 @@ export const ProjectsPage: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const { logout, isAdmin } = useAuth();
+  const { logout, isAdmin, userEmail } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -69,22 +70,25 @@ export const ProjectsPage: React.FC = () => {
 
   return (
     <div className="projects-page">
-      <header className="page-header">
-        <h1>My Projects</h1>
-        <div className="header-actions">
-          {isAdmin && (
-            <Button variant="secondary" onClick={() => navigate('/admin')}>
-              Admin Panel
+      <PageHeader
+        title="My Projects"
+        userEmail={userEmail}
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => navigate('/admin')}>
+                Admin Panel
+              </Button>
+            )}
+            <Button onClick={() => setShowCreateModal(true)}>
+              New Project
             </Button>
-          )}
-          <Button onClick={() => setShowCreateModal(true)}>
-            New Project
-          </Button>
-          <Button variant="secondary" onClick={logout}>
-            Logout
-          </Button>
-        </div>
-      </header>
+            <Button variant="secondary" onClick={logout}>
+              Logout
+            </Button>
+          </>
+        }
+      />
 
       <div className="projects-container">
         {projects.length === 0 ? (

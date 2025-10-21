@@ -1,0 +1,209 @@
+.data-table-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-table-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-grey-300);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-white);
+}
+
+.data-table-header h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--color-grey-900);
+}
+
+.data-table-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.create-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  font-size: var(--font-size-base);
+}
+
+.create-button:hover {
+  opacity: 0.9;
+}
+
+.clear-filters-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-grey-100);
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--radius-md);
+  color: var(--color-grey-900);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-size: var(--font-size-base);
+}
+
+.clear-filters-button:hover {
+  background: var(--color-grey-200);
+}
+
+.data-table-filters {
+  padding: var(--spacing-lg);
+  background: var(--color-grey-100);
+  border-bottom: 1px solid var(--color-grey-300);
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.filter-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 150px;
+}
+
+.filter-input-group label {
+  font-size: var(--font-size-sm);
+  color: var(--color-grey-600);
+  font-weight: 500;
+}
+
+.filter-input {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-grey-300);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-grey-900);
+  font-size: var(--font-size-sm);
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.data-table-scroll {
+  flex: 1;
+  overflow: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--color-grey-100);
+  z-index: 1;
+}
+
+.data-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-grey-900);
+  border-bottom: 2px solid var(--color-grey-300);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-grey-300);
+  color: var(--color-grey-900);
+  font-size: var(--font-size-sm);
+  max-width: 300px;
+}
+
+.data-table tbody tr:hover {
+  background: var(--color-grey-50);
+}
+
+.empty-message {
+  text-align: center !important;
+  color: var(--color-grey-600);
+  padding: var(--spacing-xl) !important;
+  font-style: italic;
+}
+
+.null-value {
+  color: var(--color-grey-600);
+  font-style: italic;
+}
+
+.json-value {
+  max-width: 300px;
+  max-height: 100px;
+  overflow: auto;
+  padding: var(--spacing-xs);
+  background: var(--color-grey-100);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
+
+.relation-array {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.relation-link {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.relation-link:hover {
+  opacity: 0.8;
+}
+
+.row-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.edit-button,
+.delete-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  font-size: var(--font-size-xs);
+}
+
+.edit-button {
+  background: var(--color-primary);
+  color: white;
+}
+
+.delete-button {
+  background: var(--color-error);
+  color: white;
+}
+
+.edit-button:hover,
+.delete-button:hover {
+  opacity: 0.8;
+}

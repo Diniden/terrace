@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectsApi } from '../api/projects';
 import { corpusesApi } from '../api/corpuses';
 import { factsApi } from '../api/facts';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { Spinner } from '../components/common/Spinner';
 import { Modal } from '../components/common/Modal';
 import { TextInput } from '../components/common/TextInput';
+import { PageHeader } from '../components/common/PageHeader';
 import { FactCard } from '../components/user/FactCard';
 import type { Project, Corpus, Fact, FactState } from '../types';
 import './ProjectDetailPage.css';
@@ -14,6 +16,7 @@ import './ProjectDetailPage.css';
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { userEmail } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [corpuses, setCorpuses] = useState<Corpus[]>([]);
@@ -22,12 +25,100 @@ export const ProjectDetailPage: React.FC = () => {
   const [showNewCorpusModal, setShowNewCorpusModal] = useState(false);
   const [newCorpusName, setNewCorpusName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [llmInput, setLlmInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+
+  const llmInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (projectId) {
       loadProjectData();
     }
   }, [projectId]);
+
+  useEffect(() => {
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      let finalTranscript = '';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        setLlmInput(finalTranscript + interimTranscript);
+
+        // Reset silence timer
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+        }
+
+        // Stop after 2 seconds of silence
+        silenceTimerRef.current = window.setTimeout(() => {
+          stopListening();
+        }, 2000);
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        stopListening();
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+        }
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    // Keyboard shortcuts
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Check if user is already focusing an input element
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement instanceof HTMLInputElement ||
+                            activeElement instanceof HTMLTextAreaElement;
+
+      if (isInputFocused) return;
+
+      if (e.key === 'l') {
+        e.preventDefault();
+        llmInputRef.current?.focus();
+      } else if (e.key === 'k') {
+        e.preventDefault();
+        startListening();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadProjectData = async () => {
     if (!projectId) return;
@@ -98,6 +189,49 @@ export const ProjectDetailPage: React.FC = () => {
     await loadProjectData();
   };
 
+  const startListening = () => {
+    if (recognitionRef.current && !isListening) {
+      setIsListening(true);
+      llmInputRef.current?.focus();
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  // Helper function to order corpuses from root (no parent) to leaves (left to right)
+  const orderCorpusesLeftToRight = (corpuses: Corpus[]): Corpus[] => {
+    if (corpuses.length === 0) return [];
+
+    const ordered: Corpus[] = [];
+
+    // Find the root corpus (no basisCorpusId)
+    let current = corpuses.find(c => !c.basisCorpusId);
+
+    // Traverse the chain from root to leaves
+    while (current) {
+      ordered.push(current);
+      // Find the child of current corpus
+      const child = corpuses.find(c => c.basisCorpusId === current!.id);
+      current = child;
+    }
+
+    return ordered;
+  };
+
   if (loading) {
     return (
       <div className="project-detail-page">
@@ -116,33 +250,20 @@ export const ProjectDetailPage: React.FC = () => {
 
   return (
     <div className="project-detail-page">
-      <header className="page-header">
-        <div className="header-left">
-          <Button variant="secondary" onClick={() => navigate('/projects')}>
-            ← Back
-          </Button>
-          <h1>{project.name}</h1>
-        </div>
-        <div className="header-actions">
-          <Button onClick={() => setShowNewCorpusModal(true)}>
-            New Corpus
-          </Button>
-        </div>
-      </header>
-
-      <footer className="page-footer">
-        <div className="llm-chat-container">
-          <input
-            type="text"
-            className="llm-chat-input"
-            placeholder="Chat with LLM (not functional yet)..."
-            disabled
-          />
-          <button className="voice-button" disabled title="Voice input (not functional yet)">
-            🎤
-          </button>
-        </div>
-      </footer>
+      <PageHeader
+        title={project.name}
+        userEmail={userEmail}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => navigate('/projects')}>
+              ← Back
+            </Button>
+            <Button onClick={() => setShowNewCorpusModal(true)}>
+              New Corpus
+            </Button>
+          </>
+        }
+      />
 
       <main className="project-main">
         {corpuses.length === 0 ? (
@@ -151,37 +272,60 @@ export const ProjectDetailPage: React.FC = () => {
           </div>
         ) : (
           <div className="corpus-columns">
-            {corpuses.map((corpus) => (
+            {orderCorpusesLeftToRight(corpuses).map((corpus) => (
               <div key={corpus.id} className="corpus-column">
-                <div className="corpus-facts">
-                  {(!factsByCorpus[corpus.id] || factsByCorpus[corpus.id].length === 0) ? (
-                    <div className="empty-corpus">
-                      <p>No facts yet</p>
-                    </div>
-                  ) : (
-                    <div className="facts-list">
-                      {factsByCorpus[corpus.id].map((fact) => (
-                        <FactCard
-                          key={fact.id}
-                          fact={fact}
-                          onUpdate={handleUpdateFact}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    className="add-fact-button"
-                    onClick={() => handleCreateFact(corpus.id)}
-                    title="Add new fact"
-                  >
-                    +
-                  </button>
+                <div className="corpus-column-inner">
+                  <div className="corpus-facts">
+                    {(!factsByCorpus[corpus.id] || factsByCorpus[corpus.id].length === 0) ? (
+                      <div className="empty-corpus">
+                        <p>No facts yet</p>
+                      </div>
+                    ) : (
+                      <div className="facts-list">
+                        {factsByCorpus[corpus.id].map((fact) => (
+                          <FactCard
+                            key={fact.id}
+                            fact={fact}
+                            onUpdate={handleUpdateFact}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="corpus-actions">
+                    <Button
+                      className="add-fact-button"
+                      onClick={() => handleCreateFact(corpus.id)}
+                    >
+                      +
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </main>
+
+      <footer className="page-footer">
+        <div className="llm-chat-container">
+          <input
+            ref={llmInputRef}
+            type="text"
+            className="llm-chat-input"
+            placeholder="Chat with LLM... (Press 'l' to focus, 'k' for voice)"
+            value={llmInput}
+            onChange={(e) => setLlmInput(e.target.value)}
+          />
+          <button
+            className={`voice-button ${isListening ? 'listening' : ''}`}
+            onClick={toggleListening}
+            title={isListening ? 'Stop listening (or wait 2s)' : 'Start voice input (or press k)'}
+          >
+            🎤
+          </button>
+        </div>
+      </footer>
 
       <Modal
         isOpen={showNewCorpusModal}

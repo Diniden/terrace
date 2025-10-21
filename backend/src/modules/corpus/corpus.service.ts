@@ -90,10 +90,33 @@ export class CorpusService {
       throw new NotFoundException('Project not found');
     }
 
-    // Validate basis corpus if provided
-    if (basisCorpusId) {
+    // Auto-determine parent corpus if not explicitly provided
+    let parentCorpusId = basisCorpusId;
+
+    if (!basisCorpusId) {
+      // Find all corpuses in the project
+      const existingCorpuses = await this.corpusRepository.find({
+        where: { projectId },
+        relations: ['dependentCorpuses'],
+      });
+
+      if (existingCorpuses.length > 0) {
+        // Find the corpus with no children (tail of the chain)
+        const tailCorpus = existingCorpuses.find(
+          corpus => !corpus.dependentCorpuses || corpus.dependentCorpuses.length === 0
+        );
+
+        if (tailCorpus) {
+          parentCorpusId = tailCorpus.id;
+        }
+      }
+      // If no corpuses exist, parentCorpusId remains undefined (no parent)
+    }
+
+    // Validate basis corpus if determined
+    if (parentCorpusId) {
       const basisCorpus = await this.corpusRepository.findOne({
-        where: { id: basisCorpusId },
+        where: { id: parentCorpusId },
       });
 
       if (!basisCorpus) {
@@ -111,7 +134,7 @@ export class CorpusService {
     const corpus = this.corpusRepository.create({
       ...corpusData,
       projectId,
-      basisCorpusId,
+      basisCorpusId: parentCorpusId,
     });
 
     return this.corpusRepository.save(corpus);

@@ -1,0 +1,22 @@
+.app-layout {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.app-layout__user-email {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  font-size: 11px;
+  color: var(--color-grey-500);
+  opacity: 0.3;
+  z-index: 1000;
+  pointer-events: none;
+  user-select: none;
+}
+
+.app-layout__content {
+  width: 100%;
+  min-height: 100vh;
+}

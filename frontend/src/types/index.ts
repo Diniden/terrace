@@ -92,6 +92,12 @@ export interface AuthResponse {
   accessToken: string;
 }
 
+export interface ProfileResponse {
+  id: string;
+  email: string;
+  applicationRole: ApplicationRole;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

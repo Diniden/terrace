@@ -2,6 +2,87 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTriggers1700000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Create function to set fact state based on statement
+    await queryRunner.query(`
+      CREATE OR REPLACE FUNCTION set_fact_state_on_empty_statement()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.statement IS NULL OR NEW.statement = '' THEN
+          NEW.state = 'incomplete';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    // Create function to decouple relationships when corpus changes
+    await queryRunner.query(`
+      CREATE OR REPLACE FUNCTION decouple_fact_relationships_on_corpus_change()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF OLD.corpus_id IS DISTINCT FROM NEW.corpus_id THEN
+          -- Remove support relationships where this fact supports others
+          DELETE FROM fact_support WHERE supporting_fact_id = NEW.id;
+          -- Remove support relationships where this fact is supported
+          DELETE FROM fact_support WHERE supported_fact_id = NEW.id;
+          -- Clear basis
+          NEW.basis_id = NULL;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    // Create function to validate fact basis
+    await queryRunner.query(`
+      CREATE OR REPLACE FUNCTION validate_fact_basis()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.basis_id IS NOT NULL THEN
+          -- Check if basis fact exists and belongs to same corpus
+          IF NOT EXISTS (
+            SELECT 1 FROM facts
+            WHERE id = NEW.basis_id
+            AND corpus_id = NEW.corpus_id
+          ) THEN
+            RAISE EXCEPTION 'Basis fact must belong to the same corpus';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    // Create function to validate fact support relationships
+    await queryRunner.query(`
+      CREATE OR REPLACE FUNCTION validate_fact_support()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        supporting_corpus_id UUID;
+        supported_corpus_id UUID;
+      BEGIN
+        -- Get corpus_id for both facts
+        SELECT corpus_id INTO supporting_corpus_id
+        FROM facts WHERE id = NEW.supporting_fact_id;
+
+        SELECT corpus_id INTO supported_corpus_id
+        FROM facts WHERE id = NEW.supported_fact_id;
+
+        -- Validate same corpus
+        IF supporting_corpus_id IS DISTINCT FROM supported_corpus_id THEN
+          RAISE EXCEPTION 'Support relationship must be between facts in the same corpus';
+        END IF;
+
+        -- Prevent self-support
+        IF NEW.supporting_fact_id = NEW.supported_fact_id THEN
+          RAISE EXCEPTION 'A fact cannot support itself';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
     // Create trigger for automatic fact state management
     await queryRunner.query(`
       CREATE TRIGGER trigger_set_fact_state_on_empty_statement
@@ -36,6 +117,7 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Drop triggers first
     await queryRunner.query(
       `DROP TRIGGER IF EXISTS trigger_validate_fact_support ON fact_support;`,
     );
@@ -47,6 +129,18 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
     );
     await queryRunner.query(
       `DROP TRIGGER IF EXISTS trigger_set_fact_state_on_empty_statement ON facts;`,
+    );
+
+    // Drop functions
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS validate_fact_support();`,
+    );
+    await queryRunner.query(`DROP FUNCTION IF EXISTS validate_fact_basis();`);
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS decouple_fact_relationships_on_corpus_change();`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS set_fact_state_on_empty_statement();`,
     );
   }
 }
