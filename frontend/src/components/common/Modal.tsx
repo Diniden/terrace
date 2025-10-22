@@ -12,13 +12,13 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <div className="modal__overlay" onClick={onClose}>
+      <div className="modal__content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal__header">
+          <h2 className="modal__title">{title}</h2>
+          <button className="modal__closeButton" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body">
+        <div className="modal__body">
           {children}
         </div>
       </div>

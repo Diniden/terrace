@@ -1,4 +1,4 @@
-.admin-page {
+.adminPage {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -6,22 +6,22 @@
   background: var(--color-grey-100);
 }
 
-.admin-main {
+.adminPage__main {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-.admin-content {
+.adminPage__content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.admin-loading,
-.admin-unauthorized,
-.admin-empty {
+.adminPage__loading,
+.adminPage__unauthorized,
+.adminPage__empty {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,18 +30,18 @@
   font-size: var(--font-size-lg);
 }
 
-.admin-unauthorized {
+.adminPage__unauthorized {
   flex-direction: column;
   gap: var(--spacing-md);
 }
 
-.admin-unauthorized h1 {
+.adminPage__unauthorizedTitle {
   font-size: var(--font-size-xl);
   color: var(--color-error);
   margin: 0;
 }
 
-.admin-unauthorized p {
+.adminPage__unauthorizedText {
   margin: 0;
   color: var(--color-grey-600);
 }

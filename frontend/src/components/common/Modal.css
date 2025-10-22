@@ -1,4 +1,4 @@
-.modal-overlay {
+.modal__overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -11,7 +11,7 @@
   z-index: 1000;
 }
 
-.modal-content {
+.modal__content {
   background: var(--color-white);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
@@ -21,7 +21,7 @@
   overflow-y: auto;
 }
 
-.modal-header {
+.modal__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -29,13 +29,13 @@
   border-bottom: 1px solid var(--color-grey-200);
 }
 
-.modal-header h2 {
+.modal__title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   margin: 0;
 }
 
-.modal-close {
+.modal__closeButton {
   background: none;
   border: none;
   font-size: 2rem;
@@ -51,10 +51,10 @@
   transition: color var(--transition-fast);
 }
 
-.modal-close:hover {
+.modal__closeButton:hover {
   color: var(--color-grey-900);
 }
 
-.modal-body {
+.modal__body {
   padding: var(--spacing-lg);
 }

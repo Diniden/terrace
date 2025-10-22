@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: terrace-postgres
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-terrace}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-terrace_dev_password}
@@ -16,12 +14,28 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-terrace}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-terrace}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - terrace-network
+
+  adminer:
+    image: adminer:latest
+    container_name: terrace-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - terrace-network
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DEFAULT_USERNAME: ${POSTGRES_USER:-terrace}
+      ADMINER_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-terrace_dev_password}
+      ADMINER_DEFAULT_DB: ${POSTGRES_DB:-terrace}
 
 networks:
   terrace-network:

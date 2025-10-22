@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { Fact, FactState, PaginatedResponse } from '../types';
+import type { Fact, FactState, FactContext, PaginatedResponse } from '../types';
 
 export const factsApi = {
   async getAll(corpusId?: string, page = 1, limit = 1000): Promise<PaginatedResponse<Fact>> {
@@ -18,6 +18,7 @@ export const factsApi = {
     corpusId: string;
     basisId?: string;
     state?: FactState;
+    context?: FactContext;
     meta?: Record<string, any>;
   }): Promise<Fact> {
     return apiClient.post<Fact>('/facts', data);

@@ -25,27 +25,34 @@ This project uses a multi-agent system where specialized Claude agents handle di
 - **E2E Testing**: Playwright with MCP browser access
 - **Graph Models**: Facts/Corpuses domain model with parent-child corpus hierarchy
 
-### 4. Domain Model: Facts and Corpuses
+### 4. Domain Model: Facts, Corpuses, and Context (CRITICAL)
 **Corpuses**: Collections of Facts grouped within Projects
 - Each Corpus belongs to exactly one Project
 - Corpuses form a parent-child hierarchy via `basis_corpus_id`
 - When creating a new Corpus, it auto-assigns as child of last Corpus in project (if exists)
 
-**Facts**: Statements contained within Corpuses
+**Facts**: Statements contained within Corpuses with context field (NEW)
 - Each Fact belongs to exactly one Corpus (`corpus_id`)
-- Facts have optional basis Fact from parent Corpus (`basis_id`)
-- Facts can support other Facts in same Corpus via `fact_support` junction table
+- Each Fact has a context field: CORPUS_GLOBAL, CORPUS_BUILDER, or CORPUS_KNOWLEDGE (default)
+- Facts have optional basis Fact from parent Corpus (`basis_id`) - SUBJECT TO CONTEXT RULES
+- Facts can support other Facts in same Corpus via `fact_support` junction table - SUBJECT TO CONTEXT RULES
 - Facts have a state machine: CLARIFY (no statement), CONFLICT, READY, REJECTED, CONFIRMED
 - Auto-transitions to CLARIFY when statement is empty or null
 - Flexible metadata stored as JSONB (`meta` column)
 
+**Context-Specific Constraints** (MANDATORY - enforced at multiple layers):
+- **CORPUS_GLOBAL** (foundation facts): Cannot have basis (`basis_id` MUST be null), can only support other GLOBAL facts
+- **CORPUS_BUILDER** (generation guidelines): Cannot have basis (`basis_id` MUST be null), can only support other BUILDER facts
+- **CORPUS_KNOWLEDGE** (knowledge base): Can have basis only from parent corpus KNOWLEDGE facts, can only support other KNOWLEDGE facts
+
 **Database Validation Triggers** (defined in migration 1700000000000-CreateTriggers.ts):
 - `set_fact_state_on_empty_statement()`: Auto-set Fact state to CLARIFY if statement null/empty
-- `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus
-- `validate_fact_support()`: Enforce support relationships within same Corpus, prevent self-support
+- `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus AND context constraints
+- `validate_fact_support()`: Enforce support relationships within same Corpus AND context constraints
+- `validate_fact_context()`: NEW - Enforce context-specific basis/support rules
 - `decouple_fact_relationships_on_corpus_change()`: Clear relationships when Fact changes Corpus
 
-These constraints are enforced at database level and must be respected in application logic.
+These constraints are enforced at database level AND must be validated in business logic AND API validation.
 
 ### 5. Code Quality Standards
 - Use TypeScript strict mode
@@ -217,9 +224,11 @@ All agents working with backend code MUST:
 - ✅ Avoid writing summary files to save tokens
 
 ## Key Domain Concepts
-- **Fact**: Statement with state machine, optional basis from parent Corpus, can support other Facts
+- **Fact**: Statement with state machine, context field, optional basis from parent Corpus, can support other Facts
+- **Context**: CORPUS_GLOBAL (foundation), CORPUS_BUILDER (generation), CORPUS_KNOWLEDGE (knowledge base) - CRITICAL
 - **Corpus**: Collection of Facts with optional parent Corpus, belongs to Project
 - **State**: CLARIFY (no statement), CONFLICT, READY, REJECTED, CONFIRMED
-- **Basis**: Optional parent Fact from parent Corpus (validates via trigger)
-- **Support**: Many-to-many relationships between Facts in same Corpus (validates via trigger)
-- **Trigger**: Database-level constraint enforcement (4 triggers defined in migration)
+- **Basis**: Optional parent Fact from parent Corpus (context-aware validation via trigger)
+- **Support**: Many-to-many relationships between Facts in same Corpus with same context (validates via trigger)
+- **Trigger**: Database-level constraint enforcement (5 triggers including new context validation trigger)
+- **Context Constraint**: GLOBAL/BUILDER cannot have basis, can only support same-context facts; KNOWLEDGE can have basis from parent KNOWLEDGE facts

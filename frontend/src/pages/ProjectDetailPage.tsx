@@ -11,7 +11,8 @@ import { TextInput } from "../components/common/TextInput";
 import { PageHeader } from "../components/common/PageHeader";
 import { PageFooter } from "../components/common/PageFooter";
 import { FactCard } from "../components/user/FactCard";
-import type { Project, Corpus, Fact, FactState } from "../types";
+import type { Project, Corpus, Fact, FactState, FactContext } from "../types";
+import { FactContext as FactContextEnum } from "../types";
 import "./ProjectDetailPage.css";
 
 export const ProjectDetailPage: React.FC = () => {
@@ -152,6 +153,8 @@ export const ProjectDetailPage: React.FC = () => {
       setFactsByCorpus(factsByCorpusMap);
     } catch (err) {
       console.error("Failed to load project data:", err);
+      // Redirect to projects page if resource not found
+      navigate("/projects", { replace: true });
     } finally {
       setLoading(false);
     }
@@ -239,22 +242,20 @@ export const ProjectDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="project-detail-page">
+      <div className="projectDetailPage">
         <Spinner />
       </div>
     );
   }
 
   if (!project) {
-    return (
-      <div className="project-detail-page">
-        <p>Project not found</p>
-      </div>
-    );
+    // Redirect to projects page if project not found
+    navigate("/projects", { replace: true });
+    return null;
   }
 
   return (
-    <div className="project-detail-page">
+    <div className="projectDetailPage">
       <PageHeader
         title={project.name}
         userEmail={userEmail}
@@ -270,37 +271,49 @@ export const ProjectDetailPage: React.FC = () => {
         }
       />
 
-      <main className="project-main">
+      <main className="projectDetailPage__main">
         {corpuses.length === 0 ? (
-          <div className="empty-state">
+          <div className="projectDetailPage__emptyState">
             <p>Create a corpus to begin adding facts</p>
           </div>
         ) : (
-          <div className="corpus-columns">
+          <div className="projectDetailPage__corpusColumns">
             {orderCorpusesLeftToRight(corpuses).map((corpus) => (
-              <div key={corpus.id} className="corpus-column">
-                <div className="corpus-column-inner">
-                  <div className="corpus-facts">
+              <div key={corpus.id} className="projectDetailPage__corpusColumn">
+                <div className="projectDetailPage__corpusColumnInner">
+                  <div className="projectDetailPage__corpusFacts">
                     {!factsByCorpus[corpus.id] ||
                     factsByCorpus[corpus.id].length === 0 ? (
-                      <div className="empty-corpus">
+                      <div className="projectDetailPage__emptyCorpus">
                         <p>No facts yet</p>
                       </div>
                     ) : (
-                      <div className="facts-list">
-                        {factsByCorpus[corpus.id].map((fact) => (
-                          <FactCard
-                            key={fact.id}
-                            fact={fact}
-                            onUpdate={handleUpdateFact}
-                          />
-                        ))}
+                      <div className="projectDetailPage__factsList">
+                        {factsByCorpus[corpus.id]
+                          .filter((fact) => fact.context === FactContextEnum.CORPUS_KNOWLEDGE)
+                          .map((fact) => (
+                            <FactCard
+                              key={fact.id}
+                              fact={fact}
+                              onUpdate={handleUpdateFact}
+                            />
+                          ))}
                       </div>
                     )}
                   </div>
-                  <div className="corpus-actions">
+                  <div className="projectDetailPage__corpusActions">
                     <Button
-                      className="add-fact-button"
+                      className="projectDetailPage__editCorpusButton"
+                      variant="secondary"
+                      onClick={() => navigate(`/corpus/${corpus.id}`)}
+                      title="Edit corpus"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M11.334 2.00004C11.5091 1.82494 11.7169 1.68605 11.9457 1.59129C12.1745 1.49653 12.4197 1.44775 12.6673 1.44775C12.9149 1.44775 13.1601 1.49653 13.3889 1.59129C13.6177 1.68605 13.8256 1.82494 14.0007 2.00004C14.1758 2.17513 14.3147 2.383 14.4094 2.61178C14.5042 2.84055 14.553 3.08575 14.553 3.33337C14.553 3.58099 14.5042 3.82619 14.4094 4.05497C14.3147 4.28374 14.1758 4.49161 14.0007 4.66671L5.00065 13.6667L1.33398 14.6667L2.33398 11L11.334 2.00004Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </Button>
+                    <Button
+                      className="projectDetailPage__addFactButton"
                       onClick={() => handleCreateFact(corpus.id)}
                     >
                       +

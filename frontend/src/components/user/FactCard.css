@@ -1,15 +1,17 @@
-.fact-card {
+.factCard {
   position: relative;
   min-height: 80px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-width: 200px;
+  max-width: 300px;
 }
 
-.fact-state-indicator {
+.factCard__stateIndicator {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -23,29 +25,42 @@
   transition: opacity 0.2s ease-in-out;
 }
 
-.fact-card:hover .fact-state-indicator {
+.factCard:hover .factCard__stateIndicator {
   opacity: 1;
 }
 
-.fact-content {
+.factCard__content {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
   width: 100%;
 }
 
-.fact-statement {
+.factCard__statement {
   flex: 1;
   word-wrap: break-word;
   font-size: var(--font-size-base);
   line-height: 1.4;
 }
 
-.fact-edit-button {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+.factCard__footer {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--color-grey-200);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.factCard:hover .factCard__footer {
+  opacity: 1;
+}
+
+.factCard__actionButton {
+  width: 20px;
+  height: 20px;
   border: none;
   background: transparent;
   color: var(--color-grey-500);
@@ -53,21 +68,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   transition: all var(--transition-fast);
-  opacity: 0;
+  padding: 0;
 }
 
-.fact-card:hover .fact-edit-button {
-  opacity: 1;
-}
-
-.fact-edit-button:hover {
+.factCard__actionButton:hover {
   background-color: var(--color-grey-100);
   color: var(--color-primary);
 }
 
-.fact-input {
+.factCard__input {
   width: 100%;
   padding: var(--spacing-sm);
   border: 1px solid var(--color-primary);
@@ -76,12 +87,12 @@
   font-family: var(--font-family);
 }
 
-.fact-input:focus {
+.factCard__input:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
 }
 
-.fact-input::placeholder {
+.factCard__input::placeholder {
   color: var(--color-grey-400);
 }

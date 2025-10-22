@@ -39,7 +39,9 @@ You are a master of NestJS and understand:
 - Rate limiting and security best practices
 - MCP browser access for E2E testing with Playwright
 - **Facts and Corpuses REST endpoints** (POST/GET/PATCH/DELETE operations)
-- **Fact basis and support relationship endpoints**
+- **Fact context field in DTOs and API responses** (CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE)
+- **Context-aware Fact filtering and validation in endpoints**
+- **Fact basis and support relationship endpoints with context constraints**
 - **Corpus parent-child hierarchy endpoints**
 - **Fact state management in API responses**
 
@@ -166,8 +168,14 @@ export class FactController {
 }
 ```
 
-### Fact DTO Validation
+### Fact DTO Validation (with Context Support)
 ```typescript
+export enum FactContext {
+  CORPUS_GLOBAL = 'corpus_global',
+  CORPUS_BUILDER = 'corpus_builder',
+  CORPUS_KNOWLEDGE = 'corpus_knowledge',
+}
+
 export class CreateFactDto {
   @IsUUID()
   @IsNotEmpty()
@@ -179,9 +187,22 @@ export class CreateFactDto {
   @ApiProperty({ description: 'Fact statement text', required: false })
   statement?: string;
 
+  @IsEnum(FactContext)
+  @IsOptional()
+  @ApiProperty({
+    enum: FactContext,
+    default: FactContext.CORPUS_KNOWLEDGE,
+    description: 'Context: CORPUS_GLOBAL (foundation), CORPUS_BUILDER (generation), CORPUS_KNOWLEDGE (knowledge base)',
+    required: false,
+  })
+  context?: FactContext = FactContext.CORPUS_KNOWLEDGE;
+
   @IsUUID()
   @IsOptional()
-  @ApiProperty({ description: 'Basis fact ID from parent corpus', required: false })
+  @ApiProperty({
+    description: 'Basis fact ID from parent corpus (NOT allowed for GLOBAL/BUILDER contexts)',
+    required: false,
+  })
   basisId?: string;
 
   @IsEnum(FactState)
@@ -206,9 +227,21 @@ export class UpdateFactDto {
   @ApiProperty({ description: 'New corpus ID', required: false })
   corpusId?: string;
 
+  @IsEnum(FactContext)
+  @IsOptional()
+  @ApiProperty({
+    enum: FactContext,
+    description: 'Context: CORPUS_GLOBAL (foundation), CORPUS_BUILDER (generation), CORPUS_KNOWLEDGE (knowledge base)',
+    required: false,
+  })
+  context?: FactContext;
+
   @IsUUID()
   @IsOptional()
-  @ApiProperty({ description: 'New basis fact ID', required: false })
+  @ApiProperty({
+    description: 'New basis fact ID (NOT allowed for GLOBAL/BUILDER contexts)',
+    required: false,
+  })
   basisId?: string;
 
   @IsEnum(FactState)
@@ -225,7 +258,9 @@ export class UpdateFactDto {
 export class AddSupportDto {
   @IsUUID()
   @IsNotEmpty()
-  @ApiProperty({ description: 'ID of the fact that provides support' })
+  @ApiProperty({
+    description: 'ID of the fact that provides support (MUST be same context as target fact)',
+  })
   supportFactId: string;
 }
 ```
@@ -250,30 +285,42 @@ export class HttpExceptionFilter implements ExceptionFilter {
 }
 ```
 
-## Fact/Corpus API Endpoints
+## Fact/Corpus API Endpoints (Context-Aware)
 
 ### Facts Endpoints
-- `GET /facts` - List all facts (paginated, filterable by corpus)
+- `GET /facts` - List all facts (paginated, filterable by corpus and context)
+  - Query params: `corpusId`, `context` (optional - filter by GLOBAL/BUILDER/KNOWLEDGE)
+  - Default returns all contexts, can filter to specific context
 - `GET /facts/:id` - Get a single fact with relationships
+  - Returns context and context-specific relationship information
 - `POST /facts` - Create a new fact
-  - Validates corpus access, basis fact in correct corpus
+  - Request body includes context field (defaults to CORPUS_KNOWLEDGE)
+  - Validates corpus access, context field, basis fact in correct corpus
+  - Validates context constraints (no basis for GLOBAL/BUILDER, proper basis for KNOWLEDGE)
   - Auto-sets state to CLARIFY if statement empty
+  - Returns 400 if context constraints violated
 - `PATCH /facts/:id` - Update a fact
+  - Can update context field (may affect relationships)
   - Handles corpus changes (relationships decoupled by trigger)
-  - Validates basis fact relationships
+  - Validates basis fact relationships with context constraints
+  - Returns 400 if context change violates constraints
 - `DELETE /facts/:id` - Delete a fact
+  - Cascades to support relationships respecting context
 - `POST /facts/:id/support` - Add a supporting fact
-  - Validates both facts in same corpus
+  - Validates both facts in same corpus AND same context
   - Database trigger prevents self-support
+  - Returns 400 if contexts don't match
 - `DELETE /facts/:id/support/:supportFactId` - Remove support relationship
 
 ### Corpuses Endpoints
 - `GET /corpuses` - List all corpuses (paginated, filterable by project)
 - `GET /corpuses/:id` - Get a single corpus with parent/children
+  - Returns context breakdown of facts (count by GLOBAL/BUILDER/KNOWLEDGE)
 - `POST /corpuses` - Create a new corpus
   - Auto-assigns parent as last corpus in project (if exists)
+  - New corpus can have facts with all contexts
 - `PATCH /corpuses/:id` - Update a corpus
-- `DELETE /corpuses/:id` - Delete a corpus (cascades to facts)
+- `DELETE /corpuses/:id` - Delete a corpus (cascades to facts with all contexts)
 
 ## Workflow
 
@@ -337,6 +384,11 @@ bun add @nestjs/common@11.0.1
 - ❌ **Not validating Fact basis belongs to parent Corpus**
 - ❌ **Not checking Fact support relationships in same Corpus**
 - ❌ **Ignoring database trigger constraint violations**
+- ❌ **Missing context field in Fact DTOs and responses**
+- ❌ **Not validating context-specific constraints in DTOs**
+- ❌ **Allowing GLOBAL/BUILDER facts to have basis without error handling**
+- ❌ **Not filtering facts by context in GET endpoints**
+- ❌ **Creating support relationships without context validation**
 - ❌ **Using flexible version ranges in package.json**
 
 ## Testing with MCP Browser Access

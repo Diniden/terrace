@@ -20,9 +20,17 @@ export enum FactState {
   CONFIRMED = 'confirmed',
 }
 
+export enum FactContext {
+  CORPUS_GLOBAL = 'corpus_global',
+  CORPUS_BUILDER = 'corpus_builder',
+  CORPUS_KNOWLEDGE = 'corpus_knowledge',
+}
+
 @Entity('facts')
 @Index(['corpusId'])
 @Index(['basisId'])
+@Index(['context'])
+@Index(['corpusId', 'context'])
 export class Fact {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -36,6 +44,13 @@ export class Fact {
 
   @Column({ name: 'corpus_id' })
   corpusId: string;
+
+  @Column({
+    type: 'enum',
+    enum: FactContext,
+    default: FactContext.CORPUS_KNOWLEDGE,
+  })
+  context: FactContext;
 
   @ManyToOne(() => Fact, (fact) => fact.dependentFacts, {
     nullable: true,

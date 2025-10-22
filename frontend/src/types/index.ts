@@ -20,6 +20,12 @@ export enum FactState {
   CONFIRMED = 'confirmed',
 }
 
+export enum FactContext {
+  CORPUS_GLOBAL = 'corpus_global',
+  CORPUS_BUILDER = 'corpus_builder',
+  CORPUS_KNOWLEDGE = 'corpus_knowledge',
+}
+
 // User
 export interface User {
   id: string;
@@ -75,6 +81,7 @@ export interface Fact {
   supports?: Fact[];
   supportedBy?: Fact[];
   state: FactState;
+  context: FactContext;
   meta?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
@@ -106,4 +113,11 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
+}
+
+// Chat
+export interface ChatMessage {
+  id: string;
+  content: string;
+  createdAt: string;
 }

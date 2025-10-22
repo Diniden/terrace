@@ -9,9 +9,11 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, className = '', width, onClick }) => {
+  const cardClasses = `card ${onClick ? 'card--clickable' : ''} ${className}`.trim();
+
   return (
     <div
-      className={`card ${className}`}
+      className={cardClasses}
       style={{ width }}
       onClick={onClick}
     >

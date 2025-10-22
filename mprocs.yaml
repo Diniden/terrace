@@ -1,6 +1,13 @@
 procs:
   postgres:
     shell: "docker-compose up postgres"
+    stop: "SIGKILL"
+    env:
+      COMPOSE_PROJECT_NAME: terrace
+
+  adminer:
+    shell: "docker-compose up adminer"
+    stop: "SIGKILL"
     env:
       COMPOSE_PROJECT_NAME: terrace
 

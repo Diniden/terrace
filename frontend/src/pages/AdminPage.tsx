@@ -129,10 +129,10 @@ export const AdminPage: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="admin-page">
-        <div className="admin-unauthorized">
-          <h1>Unauthorized</h1>
-          <p>You must be an administrator to access this page.</p>
+      <div className="adminPage">
+        <div className="adminPage__unauthorized">
+          <h1 className="adminPage__unauthorizedTitle">Unauthorized</h1>
+          <p className="adminPage__unauthorizedText">You must be an administrator to access this page.</p>
         </div>
       </div>
     );
@@ -140,14 +140,14 @@ export const AdminPage: React.FC = () => {
 
   if (loading && models.length === 0) {
     return (
-      <div className="admin-page">
-        <div className="admin-loading">Loading...</div>
+      <div className="adminPage">
+        <div className="adminPage__loading">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="admin-page">
+    <div className="adminPage">
       <PageHeader
         title="Admin Panel"
         userEmail={userEmail}
@@ -157,13 +157,13 @@ export const AdminPage: React.FC = () => {
           </Button>
         }
       />
-      <div className="admin-main">
+      <div className="adminPage__main">
         <AdminSidebar
           models={models}
           selectedModel={selectedModel}
           onModelSelect={handleModelSelect}
         />
-        <div className="admin-content">
+        <div className="adminPage__content">
           {selectedMetadata ? (
             <DataTable
               metadata={selectedMetadata}
@@ -175,7 +175,7 @@ export const AdminPage: React.FC = () => {
               onFilterChange={handleFilterChange}
             />
           ) : (
-            <div className="admin-empty">
+            <div className="adminPage__empty">
               <p>Select a model from the sidebar</p>
             </div>
           )}

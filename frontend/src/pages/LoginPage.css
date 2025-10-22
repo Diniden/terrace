@@ -1,4 +1,4 @@
-.login-page {
+.loginPage {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -6,7 +6,7 @@
   background-color: var(--color-grey-100);
 }
 
-.login-card {
+.loginPage__card {
   background: var(--color-white);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
@@ -15,7 +15,7 @@
   max-width: 400px;
 }
 
-.login-card h1 {
+.loginPage__title {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   text-align: center;
@@ -23,7 +23,7 @@
   color: var(--color-grey-900);
 }
 
-.error-message {
+.loginPage__error {
   color: var(--color-error);
   font-size: var(--font-size-sm);
   margin-bottom: var(--spacing-md);
@@ -32,12 +32,12 @@
   border-radius: var(--radius-sm);
 }
 
-.login-card .button {
+.loginPage__submitButton {
   width: 100%;
   margin-bottom: var(--spacing-md);
 }
 
-.link-button {
+.loginPage__linkButton {
   background: none;
   border: none;
   color: var(--color-primary);
@@ -49,21 +49,21 @@
   margin: 0 auto;
 }
 
-.link-button:hover {
+.loginPage__linkButton:hover {
   color: #1565c0;
 }
 
-.link-button:disabled {
+.loginPage__linkButton:disabled {
   color: var(--color-grey-400);
   cursor: not-allowed;
 }
 
-.modal-actions {
+.loginPage__modalActions {
   display: flex;
   gap: var(--spacing-md);
   margin-top: var(--spacing-lg);
 }
 
-.modal-actions .button {
+.loginPage__modalActions .button {
   flex: 1;
 }

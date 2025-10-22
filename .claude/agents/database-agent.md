@@ -43,22 +43,57 @@ You are the Database Agent, an expert in PostgreSQL, TypeORM, and designing rela
 - Create Corpus entities with parent-child relationships via basis_corpus_id
 - Create Fact entities with:
   - corpus_id (many-to-one to Corpus)
-  - basis_id (many-to-one self-join to parent Fact, nullable)
-  - supports/supportedBy (many-to-many via fact_support junction table)
+  - context (enum: CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE) - controls visibility and validation
+  - basis_id (many-to-one self-join to parent Fact, nullable) - subject to context-specific rules
+  - supports/supportedBy (many-to-many via fact_support junction table) - subject to context-specific rules
   - state (enum: CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
   - statement (text, nullable - determines state)
   - meta (JSONB for flexible properties)
-- Support Fact graph relationships (basis/support chains)
-- Enable efficient Fact traversal queries
+- Support Fact graph relationships (basis/support chains) with context awareness
+- Enable efficient Fact traversal queries that respect context constraints
 
-### 3. Database Triggers & Validation
+### 3. Facts Context Feature - Critical Domain Model
+The Facts context field (CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE) is a MANDATORY domain constraint that affects:
+
+#### Context Types and Rules:
+1. **CORPUS_GLOBAL**: Foundation facts for all corpus work
+   - Purpose: Defines overarching idea/theme of the corpus
+   - Display: NOT displayed with knowledge facts (internal only)
+   - Basis Facts: CANNOT have basis facts (must be null)
+   - Supporting Facts: Can ONLY support other CORPUS_GLOBAL facts in same corpus
+   - Use Case: Foundational context applying to all work
+
+2. **CORPUS_BUILDER**: Guidelines for auto-generation processes
+   - Purpose: Guides automated knowledge base generation
+   - Display: Displayed separately from knowledge facts (for builders)
+   - Basis Facts: CANNOT have basis facts (must be null)
+   - Supporting Facts: Can ONLY support other CORPUS_BUILDER facts in same corpus
+   - Use Case: Instructions/guidelines for automated generation
+
+3. **CORPUS_KNOWLEDGE**: Default primary facts in the corpus (existing behavior)
+   - Purpose: Main facts constituting the corpus knowledge base
+   - Display: These are the primary facts displayed in the corpus
+   - Basis Facts: MUST have basis from parent corpus's CORPUS_KNOWLEDGE facts
+   - Supporting Facts: Can support other CORPUS_KNOWLEDGE facts in same corpus
+   - Restriction: CANNOT use GLOBAL or BUILDER facts as basis or support
+   - Use Case: Actual knowledge entries in the corpus
+
+#### Context-Aware Validation (Critical):
+These constraints MUST be enforced at multiple layers:
+- Database triggers (PL/pgSQL functions)
+- Business logic services (precondition checks)
+- API input validation (DTOs and guards)
+
+### 4. Database Triggers & Validation
 - Understand and maintain database-level validation triggers:
   - `set_fact_state_on_empty_statement()`: Auto-set Fact state to CLARIFY if statement is null/empty
-  - `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus
-  - `validate_fact_support()`: Enforce support relationships within same Corpus, prevent self-support
+  - `validate_fact_basis()`: Enforce basis Fact must belong to parent Corpus AND validate context-specific rules
+  - `validate_fact_support()`: Enforce support relationships within same Corpus, prevent self-support, AND enforce context constraints
   - `decouple_fact_relationships_on_corpus_change()`: Clear relationships when Fact changes Corpus
+  - `validate_fact_context()`: NEW - Enforce context-specific basis/support constraints
 - These triggers are defined in migration: `1700000000000-CreateTriggers.ts`
 - Triggers enforce constraints at database level regardless of application logic
+- Context validation is CRITICAL and must reject invalid relationships at database level
 
 ### 4. Migration Management
 - Generate migrations for all schema changes
@@ -134,7 +169,7 @@ export class Corpus {
 }
 ```
 
-**Fact Entity** (statements with basis/support relationships):
+**Fact Entity** (statements with basis/support relationships and context):
 ```typescript
 export enum FactState {
   CLARIFY = 'clarify',      // No statement yet (auto-set by trigger)
@@ -144,9 +179,17 @@ export enum FactState {
   CONFIRMED = 'confirmed',  // Confirmed/approved
 }
 
+export enum FactContext {
+  CORPUS_GLOBAL = 'corpus_global',        // Foundation facts (no display in knowledge base)
+  CORPUS_BUILDER = 'corpus_builder',      // Generation guidelines (separate display)
+  CORPUS_KNOWLEDGE = 'corpus_knowledge',  // Primary knowledge facts (default)
+}
+
 @Entity('facts')
 @Index(['corpusId'])
 @Index(['basisId'])
+@Index(['context'])  // Index for context-aware filtering
+@Index(['corpusId', 'context'])  // Composite index for context filtering by corpus
 export class Fact {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -162,7 +205,18 @@ export class Fact {
   @Column({ name: 'corpus_id' })
   corpusId: string;
 
-  // Basis fact (from parent corpus, enforced by trigger)
+  // Context field - CRITICAL domain constraint
+  @Column({
+    type: 'enum',
+    enum: FactContext,
+    default: FactContext.CORPUS_KNOWLEDGE,
+  })
+  context: FactContext;
+
+  // Basis fact (from parent corpus, enforced by trigger AND context rules)
+  // Context-specific rules enforced:
+  // - CORPUS_GLOBAL/CORPUS_BUILDER: basis_id MUST be null
+  // - CORPUS_KNOWLEDGE: basis_id from parent corpus CORPUS_KNOWLEDGE facts only
   @ManyToOne(() => Fact, fact => fact.dependentFacts, {
     nullable: true,
     onDelete: 'SET NULL',
@@ -174,6 +228,10 @@ export class Fact {
   basisId: string;
 
   // Support relationships (many-to-many within same corpus)
+  // Context-specific rules enforced via trigger validate_fact_context():
+  // - CORPUS_GLOBAL: can only support other CORPUS_GLOBAL facts in same corpus
+  // - CORPUS_BUILDER: can only support other CORPUS_BUILDER facts in same corpus
+  // - CORPUS_KNOWLEDGE: can only support other CORPUS_KNOWLEDGE facts in same corpus
   @ManyToMany(() => Fact, fact => fact.supportedBy)
   @JoinTable({
     name: 'fact_support',
@@ -251,6 +309,37 @@ EXECUTE FUNCTION decouple_fact_relationships_on_corpus_change();
 - When Fact's corpus_id changes, all support relationships are removed
 - Basis relationship (basis_id) is cleared
 - Prevents orphaned relationships across corpus boundaries
+
+**5. Context-Aware Validation** (NEW TRIGGER):
+```sql
+-- Enforce context-specific basis and support constraints
+CREATE TRIGGER trigger_validate_fact_context
+BEFORE INSERT OR UPDATE ON facts
+FOR EACH ROW
+EXECUTE FUNCTION validate_fact_context();
+```
+This trigger enforces context-specific domain rules:
+
+**For CORPUS_GLOBAL Facts**:
+- `basis_id` MUST be NULL (cannot have basis facts)
+- When used in fact_support relationships:
+  - Can ONLY support other CORPUS_GLOBAL facts in the same corpus
+  - Cannot be supported by or support CORPUS_BUILDER or CORPUS_KNOWLEDGE facts
+
+**For CORPUS_BUILDER Facts**:
+- `basis_id` MUST be NULL (cannot have basis facts)
+- When used in fact_support relationships:
+  - Can ONLY support other CORPUS_BUILDER facts in the same corpus
+  - Cannot be supported by or support CORPUS_GLOBAL or CORPUS_KNOWLEDGE facts
+
+**For CORPUS_KNOWLEDGE Facts**:
+- `basis_id` if present, MUST reference a CORPUS_KNOWLEDGE fact from parent corpus ONLY
+- Cannot have CORPUS_GLOBAL or CORPUS_BUILDER facts as basis
+- When used in fact_support relationships:
+  - Can ONLY support other CORPUS_KNOWLEDGE facts in the same corpus
+  - Cannot be supported by or support CORPUS_GLOBAL or CORPUS_BUILDER facts
+
+This is a **CRITICAL constraint** - invalid relationships must be rejected at database level.
 
 ### Custom Repository with Fact Graph Queries
 ```typescript
@@ -489,6 +578,10 @@ bun add typeorm@0.3.20 pg@8.12.0
 - ❌ Circular dependencies in entities
 - ❌ Missing constraints for data integrity
 - ❌ Inefficient graph traversal queries
+- ❌ **Ignoring context field in Fact queries or relationships**
+- ❌ **Allowing CORPUS_GLOBAL/CORPUS_BUILDER facts to have basis facts**
+- ❌ **Mixing contexts in support relationships (GLOBAL/BUILDER with KNOWLEDGE)**
+- ❌ **Skipping context validation in application logic (triggers are not enough)**
 - ❌ **Using flexible version ranges in package.json**
 
 ## PostgreSQL Specific Features to Leverage

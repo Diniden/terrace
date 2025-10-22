@@ -50,18 +50,28 @@ You are a master of NestJS services and understand:
 - Manage transactions
 - Validate business rules
 
-### 2. Fact/Corpus Operations
-- Manage Facts (statements within Corpuses)
+### 2. Fact/Corpus Operations with Context Awareness
+- Manage Facts (statements within Corpuses) with context field awareness
 - Enforce Fact state machine (CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED)
-- Manage Fact basis relationships (Facts can have a basis Fact from parent Corpus)
-- Manage Fact support relationships (Facts can support other Facts in same Corpus)
+- **Manage Fact context field (CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE) - CRITICAL**
+- Manage Fact basis relationships with context-specific rules:
+  - Facts can have a basis Fact from parent Corpus only if context permits
+  - CORPUS_GLOBAL/CORPUS_BUILDER facts CANNOT have basis facts (must validate basis_id is null)
+  - CORPUS_KNOWLEDGE facts can have basis only from parent corpus CORPUS_KNOWLEDGE facts
+- Manage Fact support relationships with context-specific rules:
+  - Facts can support other Facts in same Corpus ONLY with matching context
+  - CORPUS_GLOBAL facts can ONLY support other CORPUS_GLOBAL facts
+  - CORPUS_BUILDER facts can ONLY support other CORPUS_BUILDER facts
+  - CORPUS_KNOWLEDGE facts can ONLY support other CORPUS_KNOWLEDGE facts
+  - Cannot mix contexts in support relationships
 - Enforce database-level validation triggers:
-  - `validate_fact_basis()`: Basis Facts must belong to parent Corpus
-  - `validate_fact_support()`: Support relationships must be within same Corpus
+  - `validate_fact_basis()`: Basis Facts must belong to parent Corpus AND context-specific validation
+  - `validate_fact_support()`: Support relationships within same Corpus AND context constraints
+  - `validate_fact_context()`: NEW - Enforce context-specific basis/support rules
 - Manage Corpus hierarchy (parent-child relationships via basis_corpus_id)
 - Auto-generate Corpus parent assignment when creating child Corpuses
 - Handle Fact decoupling when corpus changes (trigger: `decouple_fact_relationships_on_corpus_change()`)
-- Implement graph traversal algorithms on Fact relationships
+- Implement graph traversal algorithms on Fact relationships with context filtering
 
 ### 3. Graph Operations
 - Implement graph traversal algorithms on Fact basis/support graph
@@ -94,22 +104,45 @@ You are a master of NestJS services and understand:
 
 ## Best Practices
 
-### Facts and Corpuses Domain Model
+### Facts and Corpuses Domain Model with Context Feature
 
 The core domain model consists of:
 
 **Corpuses**: Collections of Facts grouped by project. Corpuses have a parent-child relationship via `basis_corpus_id`. When you create a new Corpus, it automatically becomes a child of the most recent Corpus in the project (unless explicitly specified otherwise).
 
-**Facts**: Statements contained within Corpuses. Each Fact:
+**Facts**: Statements contained within Corpuses with context-specific behavior. Each Fact:
 - Belongs to exactly one Corpus (`corpus_id`)
-- Has optional basis Fact from the parent Corpus (`basis_id`) - must validate against `validate_fact_basis()` trigger
-- Can support other Facts in the same Corpus (`fact_support` junction table) - must validate against `validate_fact_support()` trigger
+- Has a context field (`CORPUS_GLOBAL`, `CORPUS_BUILDER`, or `CORPUS_KNOWLEDGE`)
+- Has optional basis Fact from the parent Corpus (`basis_id`) - subject to context-specific rules
+- Can support other Facts in the same Corpus (`fact_support` junction table) - subject to context-specific rules
 - Has a state machine: CLARIFY, CONFLICT, READY, REJECTED, CONFIRMED
 - Auto-transitions to CLARIFY if statement is empty (enforced by `set_fact_state_on_empty_statement()` trigger)
 
+**Context-Specific Constraints** (CRITICAL - enforce at service level AND database level):
+
+**CORPUS_GLOBAL Context**:
+- Cannot have basis facts (validate: `basis_id MUST be null`)
+- Can ONLY support other CORPUS_GLOBAL facts in same corpus
+- Cannot be basis for any fact
+- Use case: Foundational facts that define the corpus context
+
+**CORPUS_BUILDER Context**:
+- Cannot have basis facts (validate: `basis_id MUST be null`)
+- Can ONLY support other CORPUS_BUILDER facts in same corpus
+- Cannot be basis for any fact
+- Use case: Guidelines and instructions for automated knowledge generation
+
+**CORPUS_KNOWLEDGE Context** (default):
+- Can have basis facts ONLY from parent corpus CORPUS_KNOWLEDGE facts
+- Can ONLY support other CORPUS_KNOWLEDGE facts in same corpus
+- Cannot use CORPUS_GLOBAL or CORPUS_BUILDER facts as basis or support
+- Use case: Primary knowledge base facts
+
 **Key Constraints**:
 - Basis Facts must belong to parent Corpus (database trigger enforces)
+- Basis context constraints per type (service + trigger enforces)
 - Support relationships must be between Facts in same Corpus (database trigger enforces)
+- Support context constraints - facts can only support same-context facts (trigger enforces)
 - Facts cannot support themselves (database trigger enforces)
 - When Fact's Corpus changes, all relationships are decoupled (database trigger enforces)
 
@@ -148,20 +181,31 @@ export class FactService {
   }
 
   async create(createFactDto: CreateFactDto, user: User): Promise<Fact> {
-    const { corpusId, basisId, statement, state } = createFactDto;
+    const { corpusId, basisId, statement, state, context } = createFactDto;
 
     // Validate corpus exists and user has access
     const corpus = await this.corpusRepository.findOne({
       where: { id: corpusId },
-      relations: ['project'],
+      relations: ['project', 'basisCorpus'],
     });
 
     if (!corpus) {
       throw new NotFoundException('Corpus not found');
     }
 
-    // Validate basis fact if provided - database trigger will also validate
+    // Determine context (default to CORPUS_KNOWLEDGE)
+    const factContext = context || FactContext.CORPUS_KNOWLEDGE;
+
+    // CRITICAL: Validate context-specific basis constraints
     if (basisId) {
+      // CORPUS_GLOBAL and CORPUS_BUILDER cannot have basis facts
+      if (factContext === FactContext.CORPUS_GLOBAL ||
+          factContext === FactContext.CORPUS_BUILDER) {
+        throw new BadRequestException(
+          `${factContext} facts cannot have basis facts`,
+        );
+      }
+
       const basisFact = await this.factRepository.findOne({
         where: { id: basisId },
         relations: ['corpus'],
@@ -171,14 +215,25 @@ export class FactService {
         throw new NotFoundException('Basis fact not found');
       }
 
-      // Basis must be in same corpus or parent corpus
-      if (
-        basisFact.corpusId !== corpusId &&
-        basisFact.corpusId !== corpus.basisCorpusId
-      ) {
-        throw new BadRequestException(
-          'Basis fact must be in the same corpus or in the corpus basis corpus',
-        );
+      // For CORPUS_KNOWLEDGE facts: basis MUST be from parent corpus CORPUS_KNOWLEDGE facts
+      if (factContext === FactContext.CORPUS_KNOWLEDGE) {
+        if (basisFact.corpusId !== corpus.basisCorpusId) {
+          throw new BadRequestException(
+            'Basis fact must be from parent corpus',
+          );
+        }
+
+        if (basisFact.context !== FactContext.CORPUS_KNOWLEDGE) {
+          throw new BadRequestException(
+            'Basis fact must be CORPUS_KNOWLEDGE context',
+          );
+        }
+      }
+    } else {
+      // For CORPUS_GLOBAL and CORPUS_BUILDER, basis MUST be null
+      if (factContext === FactContext.CORPUS_GLOBAL ||
+          factContext === FactContext.CORPUS_BUILDER) {
+        // This is OK - they cannot have basis facts
       }
     }
 
@@ -190,6 +245,7 @@ export class FactService {
     const fact = this.factRepository.create({
       statement: statement || undefined,
       corpusId,
+      context: factContext,
       basisId,
       state: factState,
     });
@@ -239,6 +295,20 @@ export class FactService {
       throw new NotFoundException(
         'Support fact not found or not in same corpus',
       );
+    }
+
+    // CRITICAL: Validate context-specific support constraints
+    // Support relationships can ONLY occur between facts of the same context
+    if (fact.context !== supportFact.context) {
+      throw new BadRequestException(
+        `Cannot create support relationship between different contexts: ${fact.context} and ${supportFact.context}. ` +
+        'Support facts must have the same context.',
+      );
+    }
+
+    // Self-support check (database trigger will also validate)
+    if (factId === supportFactId) {
+      throw new BadRequestException('A fact cannot support itself');
     }
 
     // Check if already supporting (database trigger will also validate no self-support)
@@ -640,6 +710,10 @@ bun add @nestjs/common@11.0.1 rxjs@7.8.1
 - ❌ Ignoring graph cycles
 - ❌ Poor error messages
 - ❌ Tight coupling between services
+- ❌ **Ignoring context field in Fact service operations**
+- ❌ **Allowing CORPUS_GLOBAL/CORPUS_BUILDER facts to have basis facts in service logic**
+- ❌ **Creating support relationships between different contexts without validation**
+- ❌ **Skipping context validation and relying only on database triggers**
 - ❌ **Using flexible version ranges in package.json**
 
 ## Graph Algorithm Best Practices

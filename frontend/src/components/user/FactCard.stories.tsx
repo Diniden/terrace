@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { FactCard } from "./FactCard";
-import { type Fact, FactState } from "../../types";
+import { type Fact, FactState, FactContext } from "../../types";
 
 const meta = {
   title: "Components/User/FactCard",
@@ -28,6 +28,7 @@ const createFact = (overrides: Partial<Fact>): Fact => ({
   id: "1",
   corpusId: "corpus-1",
   state: FactState.READY,
+  context: FactContext.CORPUS_KNOWLEDGE,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,
@@ -171,5 +172,106 @@ export const WithMetadata: Story = {
         confidence: 0.95,
       },
     }),
+  },
+};
+
+// Context Variants - CORPUS_GLOBAL (Gold/Orange)
+export const ContextGlobal: Story = {
+  args: {
+    fact: createFact({
+      statement: "Global context facts apply across all corpuses in the project",
+      state: FactState.CONFIRMED,
+      context: FactContext.CORPUS_GLOBAL,
+    }),
+  },
+};
+
+// Context Variants - CORPUS_BUILDER (Gray)
+export const ContextBuilder: Story = {
+  args: {
+    fact: createFact({
+      statement: "Builder context facts are used during corpus construction",
+      state: FactState.READY,
+      context: FactContext.CORPUS_BUILDER,
+    }),
+  },
+};
+
+// Context Variants - CORPUS_KNOWLEDGE (Blue)
+export const ContextKnowledge: Story = {
+  args: {
+    fact: createFact({
+      statement: "Knowledge context facts represent domain knowledge in the corpus",
+      state: FactState.CONFIRMED,
+      context: FactContext.CORPUS_KNOWLEDGE,
+    }),
+  },
+};
+
+// All Context Types in Different States
+export const GlobalClarify: Story = {
+  args: {
+    fact: createFact({
+      statement: "Global context with clarify state",
+      state: FactState.CLARIFY,
+      context: FactContext.CORPUS_GLOBAL,
+    }),
+  },
+};
+
+export const BuilderConflict: Story = {
+  args: {
+    fact: createFact({
+      statement: "Builder context with conflict state",
+      state: FactState.CONFLICT,
+      context: FactContext.CORPUS_BUILDER,
+    }),
+  },
+};
+
+export const KnowledgeRejected: Story = {
+  args: {
+    fact: createFact({
+      statement: "Knowledge context with rejected state",
+      state: FactState.REJECTED,
+      context: FactContext.CORPUS_KNOWLEDGE,
+    }),
+  },
+};
+
+// All Context Types Side-by-Side
+export const AllContexts: Story = {
+  render: (args) => (
+    <div
+      style={{ display: "flex", gap: "var(--spacing-md)", flexWrap: "wrap" }}
+    >
+      <FactCard
+        {...args}
+        fact={createFact({
+          statement: "Global Context",
+          state: FactState.CONFIRMED,
+          context: FactContext.CORPUS_GLOBAL,
+        })}
+      />
+      <FactCard
+        {...args}
+        fact={createFact({
+          statement: "Builder Context",
+          state: FactState.READY,
+          context: FactContext.CORPUS_BUILDER,
+        })}
+      />
+      <FactCard
+        {...args}
+        fact={createFact({
+          statement: "Knowledge Context",
+          state: FactState.CONFIRMED,
+          context: FactContext.CORPUS_KNOWLEDGE,
+        })}
+      />
+    </div>
+  ),
+  args: {
+    onUpdate: fn(),
   },
 };

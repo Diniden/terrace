@@ -1,7 +1,8 @@
-.page-header {
+.pageHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-direction: column;
   padding: var(--spacing-sm);
   background: var(--color-white);
   border-bottom: 1px solid var(--border);
@@ -10,15 +11,14 @@
   box-shadow: var(--shadow-md);
 }
 
-.page-header h1 {
-  flex: 1;
+.pageHeader__title {
   font-size: var(--font-size-2xl);
   font-weight: 600;
   color: var(--color-grey-600);
   margin: 0;
 }
 
-.user-email {
+.pageHeader__userEmail {
   position: absolute;
   top: var(--spacing-xs);
   right: var(--spacing-xs);
@@ -26,7 +26,7 @@
   color: var(--text-secondary);
 }
 
-.header-actions {
+.pageHeader__actions {
   display: flex;
   gap: var(--spacing-sm);
   align-items: center;

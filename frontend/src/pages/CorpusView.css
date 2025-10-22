@@ -1,0 +1,256 @@
+/* CorpusView Page Styles */
+
+.corpusView {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--color-grey-100);
+}
+
+/* Corpus Name Editing */
+.corpusView__nameDisplay {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.corpusView__nameDisplay:hover {
+  background-color: var(--color-grey-200);
+}
+
+.corpusView__nameDisplay .corpusView__editIcon {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  color: var(--color-grey-500);
+}
+
+.corpusView__nameDisplay:hover .corpusView__editIcon {
+  opacity: 1;
+}
+
+.corpusView__nameInput {
+  font-family: var(--font-family);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-grey-600);
+  background-color: var(--color-white);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  outline: none;
+  min-width: 200px;
+}
+
+/* Page Body Layout */
+.corpusView__body {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex: 1;
+  overflow: hidden;
+  padding: var(--spacing-md);
+}
+
+/* Region Headers */
+.corpusView__regionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+}
+
+/* Corpus Column (Knowledge Base - Far Left) */
+.corpusView__knowledgeColumn {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 370px;
+  height: 100%;
+  border-right: 1px solid var(--color-grey-200);
+  padding-right: var(--spacing-md);
+}
+
+.corpusView__knowledgeColumnInner {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.corpusView__knowledgeColumnContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  min-height: 0;
+}
+
+.corpusView__knowledgeColumnActions {
+  flex-shrink: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+.corpusView__addFactButton {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Global Facts Region (Middle) */
+.corpusView__globalFactsRegion {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  border-right: 1px solid var(--color-grey-200);
+  overflow: hidden;
+  padding: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+}
+
+.corpusView__globalFactsRegionInner {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.corpusView__globalFactsRegionContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.corpusView__globalFactsRegionActions {
+  flex-shrink: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+/* Builder Facts Region (Far Right) */
+.corpusView__builderFactsRegion {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+}
+
+.corpusView__builderFactsRegionInner {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.corpusView__builderFactsRegionContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.corpusView__builderFactsRegionActions {
+  flex-shrink: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+/* Fact Grid Layout */
+.corpusView__factGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  align-content: flex-start;
+}
+
+/* Facts List (for corpus column) */
+.corpusView__factsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Empty State */
+.corpusView__emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl);
+  color: var(--color-grey-500);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  height: 100%;
+}
+
+.corpusView__emptyState p {
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .corpusView__body {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .corpusView__knowledgeColumn {
+    max-width: 100%;
+    min-height: 200px;
+  }
+
+  .corpusView__globalFactsRegion,
+  .corpusView__builderFactsRegion {
+    min-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .corpusView__body {
+    padding: var(--spacing-sm);
+  }
+
+  .corpusView__factGrid {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+
+  .corpusView__regionHeader {
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+}

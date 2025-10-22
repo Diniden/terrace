@@ -62,9 +62,9 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1>Terrace</h1>
+    <div className="loginPage">
+      <div className="loginPage__card">
+        <h1 className="loginPage__title">Terrace</h1>
         <form onSubmit={handleLogin}>
           <TextInput
             label="Email"
@@ -84,13 +84,13 @@ export const LoginPage: React.FC = () => {
             disabled={loading}
             placeholder="Enter your password"
           />
-          {error && <div className="error-message">{error}</div>}
-          <Button type="submit" disabled={loading}>
+          {error && <div className="loginPage__error">{error}</div>}
+          <Button className="loginPage__submitButton" type="submit" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </Button>
           <button
             type="button"
-            className="link-button"
+            className="loginPage__linkButton"
             onClick={() => setShowRegister(true)}
             disabled={loading}
           >
@@ -133,8 +133,8 @@ export const LoginPage: React.FC = () => {
             disabled={loading}
             placeholder="Re-enter your password"
           />
-          {error && <div className="error-message">{error}</div>}
-          <div className="modal-actions">
+          {error && <div className="loginPage__error">{error}</div>}
+          <div className="loginPage__modalActions">
             <Button type="submit" disabled={loading}>
               {loading ? "Creating Account..." : "Create Account"}
             </Button>

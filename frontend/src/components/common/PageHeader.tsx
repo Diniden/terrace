@@ -13,10 +13,10 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions,
 }) => {
   return (
-    <header className="page-header">
-      {userEmail && <span className="user-email">{userEmail}</span>}
-      <h1>{title}</h1>
-      {actions && <div className="header-actions">{actions}</div>}
+    <header className="pageHeader">
+      {userEmail && <span className="pageHeader__userEmail">{userEmail}</span>}
+      <h1 className="pageHeader__title">{title}</h1>
+      {actions && <div className="pageHeader__actions">{actions}</div>}
     </header>
   );
 };

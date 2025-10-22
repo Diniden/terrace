@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Terrace Local",
+      "Group": "Development",
+      "Host": "terrace-postgres",
+      "Port": 5432,
+      "MaintenanceDB": "terrace",
+      "Username": "terrace",
+      "SSLMode": "prefer",
+      "PassFile": "/tmp/pgpassfile"
+    }
+  }
+}

@@ -62,14 +62,14 @@ export const ProjectsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="projects-page">
+      <div className="projectsPage">
         <Spinner />
       </div>
     );
   }
 
   return (
-    <div className="projects-page">
+    <div className="projectsPage">
       <PageHeader
         title="My Projects"
         userEmail={userEmail}
@@ -90,21 +90,21 @@ export const ProjectsPage: React.FC = () => {
         }
       />
 
-      <div className="projects-container">
+      <div className="projectsPage__container">
         {projects.length === 0 ? (
-          <div className="empty-state">
+          <div className="projectsPage__emptyState">
             <p>Click New Project to begin</p>
           </div>
         ) : (
-          <div className="projects-grid">
+          <div className="projectsPage__grid">
             {projects.map((project) => (
               <Card
                 key={project.id}
-                className="project-card clickable"
+                className="projectsPage__projectCard"
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
-                <h3>{project.name}</h3>
-                {project.description && <p>{project.description}</p>}
+                <h3 className="projectsPage__projectTitle">{project.name}</h3>
+                {project.description && <p className="projectsPage__projectDescription">{project.description}</p>}
               </Card>
             ))}
           </div>
@@ -134,8 +134,8 @@ export const ProjectsPage: React.FC = () => {
             rows={3}
             placeholder="Enter project description"
           />
-          {error && <div className="error-message">{error}</div>}
-          <div className="modal-actions">
+          {error && <div className="loginPage__error">{error}</div>}
+          <div className="loginPage__modalActions">
             <Button type="submit" disabled={creating}>
               {creating ? 'Creating...' : 'Create Project'}
             </Button>

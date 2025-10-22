@@ -17,11 +17,12 @@ You are the DevOps Agent, a TypeScript expert specializing in writing automation
 
 ## Project Context
 This project consists of:
-- **Backend**: NestJS application with Facts/Corpuses domain model
+- **Backend**: NestJS application with Facts/Corpuses domain model (with context field)
 - **Frontend**: React application with TypeScript and Vite
 - **Database**: PostgreSQL with TypeORM and database triggers for validation
 - **Scripts**: Bun-based automation for database, migrations, and seeding
 - Both services run concurrently via mprocs (process manager)
+- **Facts Context Feature** (NEW): Facts have context field (CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE) with specific constraints
 
 ## Expertise
 - Bun runtime and its APIs
@@ -43,10 +44,14 @@ This project consists of:
 - Manage concurrent processes
 - Set up hot reload workflows
 
-### 2. Database Utilities
-- Write database seeding scripts
+### 2. Database Utilities with Context-Aware Seeding
+- Write database seeding scripts that respect context constraints
 - Create migration runners
-- Implement data generation utilities
+- Implement data generation utilities with context awareness:
+  - Generate CORPUS_GLOBAL facts with null basis_id
+  - Generate CORPUS_BUILDER facts with null basis_id
+  - Generate CORPUS_KNOWLEDGE facts with proper basis relationships
+  - Ensure context constraints are not violated during seeding
 - Build backup and restore scripts
 - Handle database reset for development
 
@@ -355,6 +360,102 @@ dev().catch((error) => {
 });
 ```
 
+### Context-Aware Database Seeding
+```typescript
+#!/usr/bin/env bun
+// scripts/seed-database.ts - Context-Aware Version
+
+import { faker } from '@faker-js/faker';
+
+// CRITICAL: Facts context types must match database enum
+export enum FactContext {
+  CORPUS_GLOBAL = 'corpus_global',
+  CORPUS_BUILDER = 'corpus_builder',
+  CORPUS_KNOWLEDGE = 'corpus_knowledge',
+}
+
+interface SeededFact {
+  id: string;
+  context: FactContext;
+  corpusId: string;
+  basisId?: string;
+  statement: string;
+}
+
+async function seedDatabase() {
+  console.log('🌱 Seeding database with context-aware facts...\n');
+
+  // Example seeding logic with context constraints
+  const facts: SeededFact[] = [];
+
+  // CORPUS_GLOBAL facts (no basis, cannot have basis_id)
+  console.log('📌 Creating CORPUS_GLOBAL facts (foundation facts)...');
+  for (let i = 0; i < 3; i++) {
+    facts.push({
+      id: faker.string.uuid(),
+      context: FactContext.CORPUS_GLOBAL,
+      corpusId: 'corpus-1',
+      // NOTE: basis_id MUST be null for GLOBAL facts - database trigger enforces
+      statement: faker.lorem.sentence(),
+    });
+  }
+  console.log('   ✓ Created 3 CORPUS_GLOBAL facts\n');
+
+  // CORPUS_BUILDER facts (no basis, for generation guidelines)
+  console.log('🔨 Creating CORPUS_BUILDER facts (generation guidelines)...');
+  for (let i = 0; i < 2; i++) {
+    facts.push({
+      id: faker.string.uuid(),
+      context: FactContext.CORPUS_BUILDER,
+      corpusId: 'corpus-1',
+      // NOTE: basis_id MUST be null for BUILDER facts - database trigger enforces
+      statement: faker.lorem.sentence(),
+    });
+  }
+  console.log('   ✓ Created 2 CORPUS_BUILDER facts\n');
+
+  // CORPUS_KNOWLEDGE facts (can have basis from parent corpus KNOWLEDGE facts)
+  console.log('📚 Creating CORPUS_KNOWLEDGE facts (knowledge base)...');
+  const corpusKnowledgeFacts = facts.filter((f) => f.context === FactContext.CORPUS_GLOBAL);
+
+  for (let i = 0; i < 5; i++) {
+    const hasBasis = i > 0 && corpusKnowledgeFacts.length > 0;
+    facts.push({
+      id: faker.string.uuid(),
+      context: FactContext.CORPUS_KNOWLEDGE,
+      corpusId: 'corpus-1',
+      // CRITICAL: basis must be from parent corpus KNOWLEDGE facts only
+      // If basis_id is set, it MUST reference a KNOWLEDGE context fact
+      basisId: hasBasis ? corpusKnowledgeFacts[0].id : undefined,
+      statement: faker.lorem.sentence(),
+    });
+  }
+  console.log('   ✓ Created 5 CORPUS_KNOWLEDGE facts\n');
+
+  // Insert facts while respecting context constraints
+  console.log('💾 Persisting facts (context constraints enforced by triggers)...');
+  for (const fact of facts) {
+    // Validation: GLOBAL/BUILDER facts cannot have basis
+    if ((fact.context === FactContext.CORPUS_GLOBAL || fact.context === FactContext.CORPUS_BUILDER) &&
+        fact.basisId) {
+      console.error(`❌ ERROR: ${fact.context} fact cannot have basis_id`);
+      process.exit(1);
+    }
+
+    // Insert fact (database triggers will also validate)
+    // Connection.save(fact) would go here
+    console.log(`   ✓ Created ${fact.context} fact`);
+  }
+
+  console.log('\n✅ Database seeded successfully with context-aware facts!');
+}
+
+seedDatabase().catch((error) => {
+  console.error('❌ Error seeding database:', error);
+  process.exit(1);
+});
+```
+
 ### Database Reset Script
 ```typescript
 #!/usr/bin/env bun
@@ -387,17 +488,17 @@ async function resetDatabase() {
     process.exit(1);
   }
 
-  // Seed database
-  console.log('3️⃣  Seeding database...');
+  // Seed database with context awareness
+  console.log('3️⃣  Seeding database with context-aware facts...');
   try {
     await $`bun run ../scripts/seed-database.ts`.cwd(backendDir);
-    console.log('   ✓ Database seeded\n');
+    console.log('   ✓ Database seeded with context constraints\n');
   } catch (error) {
     console.error('   ❌ Seeding failed:', error);
     process.exit(1);
   }
 
-  console.log('✅ Database reset complete!');
+  console.log('✅ Database reset complete with context-aware seeding!');
 }
 
 resetDatabase().catch((error) => {
@@ -574,6 +675,10 @@ bun add package-name@1.2.3
 - ❌ Blocking synchronous operations
 - ❌ **Using flexible version ranges (^, ~, >, >=, *, x) in package.json**
 - ❌ **Installing dependencies without specifying exact versions**
+- ❌ **Seeding GLOBAL/BUILDER facts with basis_id values**
+- ❌ **Not validating context constraints in seeding scripts**
+- ❌ **Mixing contexts in support relationships during seeding**
+- ❌ **Skipping context validation in seed data generation**
 
 ## Bun Specific Features to Leverage
 - ✅ `Bun.$` for shell commands

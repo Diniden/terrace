@@ -8,6 +8,7 @@ import './theme.css';
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
+const CorpusView = lazy(() => import('./pages/CorpusView').then(m => ({ default: m.CorpusView })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
 
 // Protected Route wrapper
@@ -73,6 +74,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ProjectDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corpus/:corpusId"
+          element={
+            <ProtectedRoute>
+              <CorpusView />
             </ProtectedRoute>
           }
         />

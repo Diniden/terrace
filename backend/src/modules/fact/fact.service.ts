@@ -6,10 +6,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Fact, FactState } from '../../entities/fact.entity';
+import { Fact, FactState, FactContext } from '../../entities/fact.entity';
 import { Corpus } from '../../entities/corpus.entity';
 import { Project } from '../../entities/project.entity';
-import { ProjectMember, ProjectRole } from '../../entities/project-member.entity';
+import {
+  ProjectMember,
+  ProjectRole,
+} from '../../entities/project-member.entity';
 import { User, ApplicationRole } from '../../entities/user.entity';
 import { CreateFactDto } from './dto/create-fact.dto';
 import { UpdateFactDto } from './dto/update-fact.dto';
@@ -56,11 +59,7 @@ export class FactService {
         throw new NotFoundException('Corpus not found');
       }
 
-      await this.checkProjectAccess(
-        corpus.projectId,
-        user,
-        ProjectRole.VIEWER,
-      );
+      await this.checkProjectAccess(corpus.projectId, user, ProjectRole.VIEWER);
       queryBuilder.where('fact.corpusId = :corpusId', { corpusId });
     } else {
       // Filter by accessible projects
@@ -81,7 +80,13 @@ export class FactService {
   async findOne(id: string, user: User): Promise<Fact> {
     const fact = await this.factRepository.findOne({
       where: { id },
-      relations: ['corpus', 'corpus.project', 'basis', 'supports', 'supportedBy'],
+      relations: [
+        'corpus',
+        'corpus.project',
+        'basis',
+        'supports',
+        'supportedBy',
+      ],
     });
 
     if (!fact) {
@@ -98,8 +103,34 @@ export class FactService {
     return fact;
   }
 
+  async findByContext(
+    corpusId: string,
+    context: FactContext,
+    user: User,
+  ): Promise<Fact[]> {
+    // Get corpus and check access
+    const corpus = await this.corpusRepository.findOne({
+      where: { id: corpusId },
+      relations: ['project'],
+    });
+
+    if (!corpus) {
+      throw new NotFoundException('Corpus not found');
+    }
+
+    await this.checkProjectAccess(corpus.projectId, user, ProjectRole.VIEWER);
+
+    // Find facts by context
+    return this.factRepository.find({
+      where: { corpusId, context },
+      relations: ['basis', 'supports'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async create(createFactDto: CreateFactDto, user: User): Promise<Fact> {
-    const { corpusId, basisId, statement, state, meta } = createFactDto;
+    const { corpusId, basisId, statement, state, meta, context } =
+      createFactDto;
 
     // Get corpus and check access
     const corpus = await this.corpusRepository.findOne({
@@ -117,6 +148,12 @@ export class FactService {
       ProjectRole.CONTRIBUTOR,
     );
 
+    // Default context to CORPUS_KNOWLEDGE if not provided
+    const factContext = context || FactContext.CORPUS_KNOWLEDGE;
+
+    // Validate context-specific basis constraints
+    await this.validateContextBasisConstraints(factContext, basisId);
+
     // Validate basis if provided
     if (basisId) {
       const basisFact = await this.factRepository.findOne({
@@ -126,6 +163,16 @@ export class FactService {
 
       if (!basisFact) {
         throw new NotFoundException('Basis fact not found');
+      }
+
+      // If context is CORPUS_KNOWLEDGE, validate basis fact context
+      if (factContext === FactContext.CORPUS_KNOWLEDGE) {
+        if (basisFact.context !== FactContext.CORPUS_KNOWLEDGE) {
+          throw new BadRequestException(
+            `Cannot set basis from context '${basisFact.context}' for a fact with context 'corpus_knowledge'. ` +
+              'Basis fact must also have context=corpus_knowledge.',
+          );
+        }
       }
 
       // Basis must be in same corpus or corpus's basis corpus
@@ -149,6 +196,7 @@ export class FactService {
       statement: statement || undefined,
       corpusId,
       basisId,
+      context: factContext,
       state: factState,
       meta,
     });
@@ -169,6 +217,29 @@ export class FactService {
       user,
       ProjectRole.CONTRIBUTOR,
     );
+
+    // Determine target context (use new context if provided, otherwise keep existing)
+    const targetContext = updateFactDto.context || fact.context;
+
+    // If context is being changed
+    if (updateFactDto.context && updateFactDto.context !== fact.context) {
+      // If changing TO corpus_global or corpus_builder, must clear basisId
+      if (
+        (updateFactDto.context === FactContext.CORPUS_GLOBAL ||
+          updateFactDto.context === FactContext.CORPUS_BUILDER) &&
+        fact.basisId
+      ) {
+        // Auto-clear basisId when changing to context that doesn't allow basis
+        updateFactDto.basisId = void 0;
+      }
+    }
+
+    // Validate context-specific basis constraints for target context
+    const targetBasisId =
+      updateFactDto.basisId !== undefined
+        ? updateFactDto.basisId
+        : fact.basisId;
+    await this.validateContextBasisConstraints(targetContext, targetBasisId);
 
     // If corpus is being changed, validate new corpus
     if (updateFactDto.corpusId && updateFactDto.corpusId !== fact.corpusId) {
@@ -200,6 +271,16 @@ export class FactService {
 
         if (!basisFact) {
           throw new NotFoundException('Basis fact not found');
+        }
+
+        // If target context is CORPUS_KNOWLEDGE, validate basis fact context
+        if (targetContext === FactContext.CORPUS_KNOWLEDGE) {
+          if (basisFact.context !== FactContext.CORPUS_KNOWLEDGE) {
+            throw new BadRequestException(
+              `Cannot set basis from context '${basisFact.context}' for a fact with context 'corpus_knowledge'. ` +
+                'Basis fact must also have context=corpus_knowledge.',
+            );
+          }
         }
 
         const targetCorpusId = updateFactDto.corpusId || fact.corpusId;
@@ -277,8 +358,13 @@ export class FactService {
 
     // Support fact must be in same corpus
     if (supportFact.corpusId !== fact.corpusId) {
+      throw new BadRequestException('Support fact must be in the same corpus');
+    }
+
+    // Validate both facts have the SAME context
+    if (fact.context !== supportFact.context) {
       throw new BadRequestException(
-        'Support fact must be in the same corpus',
+        `Cannot create support relationship between different contexts: ${fact.context} and ${supportFact.context}`,
       );
     }
 
@@ -288,9 +374,7 @@ export class FactService {
     }
 
     // Check if already supporting
-    const alreadySupports = fact.supports.some(
-      (s) => s.id === supportFactId,
-    );
+    const alreadySupports = fact.supports.some((s) => s.id === supportFactId);
 
     if (!alreadySupports) {
       fact.supports.push(supportFact);
@@ -321,6 +405,38 @@ export class FactService {
     }
 
     return this.findOne(id, user);
+  }
+
+  /**
+   * Validate context-specific basis constraints
+   * - CORPUS_GLOBAL and CORPUS_BUILDER cannot have a basis
+   * - CORPUS_KNOWLEDGE can have a basis
+   */
+  private async validateContextBasisConstraints(
+    context: FactContext,
+    basisId: string | null | undefined,
+  ): Promise<void> {
+    // If no basisId provided, validation passes
+    if (!basisId) {
+      return;
+    }
+
+    // If context is CORPUS_GLOBAL or CORPUS_BUILDER, reject basisId
+    if (context === FactContext.CORPUS_GLOBAL) {
+      throw new BadRequestException(
+        'Facts with context=corpus_global cannot have a basis. ' +
+          'Global facts are foundational and must be independent.',
+      );
+    }
+
+    if (context === FactContext.CORPUS_BUILDER) {
+      throw new BadRequestException(
+        'Facts with context=corpus_builder cannot have a basis. ' +
+          'Builder facts define generation rules and must be independent.',
+      );
+    }
+
+    // CORPUS_KNOWLEDGE can have a basis (validation passes)
   }
 
   private async checkProjectAccess(
