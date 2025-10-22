@@ -37,10 +37,35 @@ services:
       ADMINER_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-terrace_dev_password}
       ADMINER_DEFAULT_DB: ${POSTGRES_DB:-terrace}
 
+  chromadb:
+    image: chromadb/chroma:0.4.22
+    container_name: terrace-chromadb
+    restart: unless-stopped
+    ports:
+      - "${CHROMA_PORT:-8000}:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - terrace-network
+
 networks:
   terrace-network:
     driver: bridge
 
 volumes:
   postgres_data:
+    driver: local
+  chromadb_data:
     driver: local

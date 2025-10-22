@@ -5,11 +5,29 @@ procs:
     env:
       COMPOSE_PROJECT_NAME: terrace
 
+  chromadb:
+    shell: "docker-compose up chromadb"
+    stop: "SIGKILL"
+    env:
+      COMPOSE_PROJECT_NAME: terrace
+
   adminer:
     shell: "docker-compose up adminer"
     stop: "SIGKILL"
     env:
       COMPOSE_PROJECT_NAME: terrace
+
+  rag-service:
+    shell: "python/venv/bin/python python/rag_service.py"
+    cwd: "."
+    env:
+      CHROMA_HOST: localhost
+      CHROMA_PORT: "8000"
+      EMBEDDING_PROVIDER: local
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: "8001"
+      LOG_LEVEL: INFO
+      NODE_ENV: development
 
   backend:
     shell: "cd backend && bun run start:dev"
