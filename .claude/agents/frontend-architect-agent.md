@@ -33,6 +33,15 @@ This project uses a Facts/Corpuses domain model where:
 - API endpoints: `/facts`, `/corpuses` with CRUD operations and context-aware filtering
 - Fact relationships must respect context constraints in UI
 
+## RAG (Retrieval-Augmented Generation) Feature
+
+RAG integration is **backend-only** in this phase:
+- **Python RAG Service**: Separate microservice handles embedding and retrieval
+- **Backend RAG Endpoints**: NestJS provides semantic search endpoints that delegate to Python service
+- **Frontend Integration**: EXPLICITLY OUT OF SCOPE for current implementation
+- Future frontend integration may include natural language search UI, but this is not required now
+- Focus frontend work on basic Fact management and context-aware display
+
 ## Expertise
 
 - React 18+ with hooks and concurrent features

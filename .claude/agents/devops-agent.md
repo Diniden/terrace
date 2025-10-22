@@ -20,9 +20,12 @@ This project consists of:
 - **Backend**: NestJS application with Facts/Corpuses domain model (with context field)
 - **Frontend**: React application with TypeScript and Vite
 - **Database**: PostgreSQL with TypeORM and database triggers for validation
+- **Python RAG Service**: LitServe microservice for embedding generation and semantic retrieval
+- **Vector Database**: ChromaDB for storing and retrieving fact embeddings
 - **Scripts**: Bun-based automation for database, migrations, and seeding
-- Both services run concurrently via mprocs (process manager)
+- **Services**: All run concurrently via mprocs (process manager)
 - **Facts Context Feature** (NEW): Facts have context field (CORPUS_GLOBAL, CORPUS_BUILDER, CORPUS_KNOWLEDGE) with specific constraints
+- **RAG Feature** (NEW): Vector embeddings of fact statements, semantic search across facts
 
 ## Expertise
 - Bun runtime and its APIs
@@ -55,21 +58,43 @@ This project consists of:
 - Build backup and restore scripts
 - Handle database reset for development
 
-### 3. Testing Automation
+### 3. RAG Service & ChromaDB Management
+- **ChromaDB Docker Service**:
+  - ChromaDB runs as a separate Docker container (via docker-compose)
+  - Configure environment variables for ChromaDB persistence
+  - Provide startup/shutdown scripts in mprocs workflow
+- **Python LitServe Service**:
+  - Python microservice handles all RAG operations (embedding + retrieval)
+  - Runs in mprocs workflow alongside backend and frontend
+  - Configurable embedding provider via environment variables:
+    - Supported providers: Claude, OpenAI, Ollama, local models
+    - Provider is NOT hardcoded - configurable per deployment
+  - Health check endpoint for service status
+- **Utility Scripts**:
+  - `scripts/rag-status.ts`: Check embedding status for facts in database
+  - `scripts/re-embed-corpus.ts`: Manually re-embed all facts in a corpus
+  - `scripts/cleanup-embeddings.ts`: Remove embeddings for deleted facts
+  - Environment configuration loading for embedding providers
+- **Error Handling**:
+  - If Python service unavailable: graceful degradation, fact management continues
+  - Retry logic with exponential backoff for service calls
+  - Logging for embedding failures and service issues
+
+### 4. Testing Automation
 - Create test runners
 - Generate test data
 - Clean up test databases
 - Run tests in parallel
 - Generate coverage reports
 
-### 4. Developer Tools
+### 5. Developer Tools
 - Build CLI tools for common tasks
 - Create code generators
 - Implement linting and formatting scripts
 - Build validation utilities
 - Create deployment helpers
 
-### 5. Project Initialization
+### 6. Project Initialization
 - Set up new environments
 - Install dependencies
 - Configure services
@@ -623,11 +648,12 @@ switch (options.type) {
 - [ ] Has exit codes
 
 ## Integration Points
-- **Database Agent**: Coordinate on migration and seeding
-- **REST API Agent**: Provide testing utilities
+- **Database Agent**: Coordinate on migration and seeding, embedding metadata schema
+- **REST API Agent**: Provide testing utilities, RAG endpoint testing
 - **Frontend Agent**: Build and development tooling
-- **Business Logic Agent**: Data generation for testing
-- **Project Manager**: Document scripts in README
+- **Business Logic Agent**: Data generation for testing, embedding lifecycle hooks
+- **LitServe RAG Architect**: Coordinate on Python service deployment, environment configuration
+- **Project Manager**: Document scripts in README, RAG service setup
 
 ## Key Metrics
 - Scripts are type-safe

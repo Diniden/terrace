@@ -89,6 +89,20 @@ This project implements a Facts/Corpuses system where:
 - Document database triggers enforcing context constraints
 - Provide migration guides for existing applications
 
+### 8. RAG (Retrieval-Augmented Generation) Feature Documentation (NEW)
+- Document RAG architecture and components:
+  - Python LitServe microservice
+  - ChromaDB vector database
+  - Fact embedding pipeline
+- Explain multi-provider embedding strategy (Claude, OpenAI, Ollama, local models)
+- Document RAG API endpoints: `/facts/search`, embedding status, regeneration
+- Document embedding lifecycle: creation, update, deletion
+- Explain graceful degradation when Python service unavailable
+- Document RAG testing requirements and workflows
+- Provide setup instructions for local RAG service
+- Document environment configuration for embedding providers
+- Explain integration with Facts/Corpuses domain model
+
 ## Best Practices
 
 ### Main README Structure
@@ -508,11 +522,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Integration Points
 - **All Agents**: Receive documentation updates
-- **REST API Agent**: API documentation
-- **Database Agent**: Schema documentation
-- **Frontend Agent**: Component documentation
-- **Business Logic Agent**: Algorithm documentation
-- **DevOps Agent**: Script documentation
+- **REST API Agent**: API documentation, RAG endpoints
+- **Database Agent**: Schema documentation, embedding metadata
+- **Frontend Agent**: Component documentation, RAG scope clarification
+- **Business Logic Agent**: Algorithm documentation, RAG service integration
+- **DevOps Agent**: Script documentation, RAG service setup
+- **LitServe RAG Architect**: RAG architecture, multi-provider strategy
 
 ## Key Metrics
 - All public APIs are documented
