@@ -64,6 +64,7 @@ You will write a plan with all of the following rules in mind:
   best guide the process carefully.
 
 - Specify AGENTS MUST BE USED AND ONLY IN THE SECTIONS THEY ARE SPECIFIED FOR.
+- Specify NO SUMMARIES ARE TO BE WRITTEN for each agent section.
 
 # Things to avoid
 
