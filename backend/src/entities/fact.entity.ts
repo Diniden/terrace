@@ -9,6 +9,8 @@ import {
   JoinColumn,
   JoinTable,
   Index,
+  AfterInsert,
+  AfterUpdate,
 } from 'typeorm';
 import { Corpus } from './corpus.entity';
 
@@ -26,11 +28,18 @@ export enum FactContext {
   CORPUS_KNOWLEDGE = 'corpus_knowledge',
 }
 
+export enum EmbeddingStatus {
+  PENDING = 'pending',
+  EMBEDDED = 'embedded',
+  FAILED = 'failed',
+}
+
 @Entity('facts')
 @Index(['corpusId'])
 @Index(['basisId'])
 @Index(['context'])
 @Index(['corpusId', 'context'])
+@Index(['embeddingStatus'])
 export class Fact {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -86,9 +95,51 @@ export class Fact {
   @ManyToMany(() => Fact)
   dependentFacts: Fact[];
 
+  // RAG Embedding Metadata
+  @Column({
+    type: 'enum',
+    enum: EmbeddingStatus,
+    default: EmbeddingStatus.PENDING,
+  })
+  embeddingStatus: EmbeddingStatus;
+
+  @Column({ name: 'last_embedded_at', nullable: true, type: 'timestamp' })
+  lastEmbeddedAt: Date | null;
+
+  @Column({ name: 'embedding_version', nullable: true })
+  embeddingVersion: string;
+
+  @Column({ name: 'embedding_model', nullable: true })
+  embeddingModel: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  // Lifecycle hooks for embedding management
+  private previousStatement?: string;
+
+  @AfterInsert()
+  markForEmbeddingAfterInsert() {
+    // New facts with statements should be embedded
+    if (this.statement && this.statement.trim() !== '') {
+      this.embeddingStatus = EmbeddingStatus.PENDING;
+    }
+  }
+
+  @AfterUpdate()
+  markForEmbeddingAfterUpdate() {
+    // If statement changed, mark for re-embedding
+    if (
+      this.previousStatement !== undefined &&
+      this.previousStatement !== this.statement &&
+      this.statement &&
+      this.statement.trim() !== ''
+    ) {
+      this.embeddingStatus = EmbeddingStatus.PENDING;
+      this.lastEmbeddedAt = null;
+    }
+  }
 }

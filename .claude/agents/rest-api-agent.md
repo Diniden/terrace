@@ -44,6 +44,9 @@ You are a master of NestJS and understand:
 - **Fact basis and support relationship endpoints with context constraints**
 - **Corpus parent-child hierarchy endpoints**
 - **Fact state management in API responses**
+- **Natural language fact query endpoints** (delegates to Python RAG service)
+- **Admin endpoints for embedding status and management**
+- **Error handling for Python RAG service failures** (graceful degradation)
 
 ## Responsibilities
 
@@ -299,18 +302,37 @@ export class HttpExceptionFilter implements ExceptionFilter {
   - Validates context constraints (no basis for GLOBAL/BUILDER, proper basis for KNOWLEDGE)
   - Auto-sets state to CLARIFY if statement empty
   - Returns 400 if context constraints violated
+  - Asynchronously triggers embedding generation in Python RAG service
 - `PATCH /facts/:id` - Update a fact
   - Can update context field (may affect relationships)
   - Handles corpus changes (relationships decoupled by trigger)
   - Validates basis fact relationships with context constraints
   - Returns 400 if context change violates constraints
+  - Updates trigger embedding regeneration in Python RAG service
 - `DELETE /facts/:id` - Delete a fact
   - Cascades to support relationships respecting context
+  - Triggers cleanup in ChromaDB (via Python RAG service)
 - `POST /facts/:id/support` - Add a supporting fact
   - Validates both facts in same corpus AND same context
   - Database trigger prevents self-support
   - Returns 400 if contexts don't match
 - `DELETE /facts/:id/support/:supportFactId` - Remove support relationship
+
+### RAG Endpoints (NEW)
+- `POST /facts/search` - Natural language fact search
+  - Request body: `{ query: string }`
+  - Delegates to Python RAG service for semantic retrieval
+  - Returns ranked list of Fact entities (full details, not just IDs)
+  - Response: `{ results: Fact[], totalCount: number }`
+  - Status 503 if Python RAG service unavailable (graceful degradation)
+- `GET /facts/embeddings/status` - Get embedding status for facts (admin endpoint)
+  - Query params: `corpusId` (optional), `status` (optional - pending/embedded/failed)
+  - Returns: `{ facts: FactEmbeddingStatus[] }`
+  - FactEmbeddingStatus includes: factId, status, embeddedAt, failureReason (if any)
+- `POST /facts/:id/embeddings/regenerate` - Manually regenerate embedding (admin endpoint)
+  - Triggers Python RAG service to re-embed the fact
+  - Returns: `{ status: 'regenerating' }`
+  - Asynchronous operation (returns immediately)
 
 ### Corpuses Endpoints
 - `GET /corpuses` - List all corpuses (paginated, filterable by project)
@@ -346,10 +368,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 4. Update API documentation in `docs/`
 
 ## Integration Points
-- **Business Logic Agent**: Controllers call services for business logic
-- **Database Agent**: Ensure DTOs align with entity models
-- **Frontend Agent**: Coordinate on response formats
-- **DevOps Agent**: Provide endpoint lists for testing scripts
+- **Business Logic Agent**: Controllers call services for business logic, RAG service integration
+- **Database Agent**: Ensure DTOs align with entity models, embedding metadata structures
+- **Frontend Agent**: Coordinate on response formats, RAG search UX
+- **DevOps Agent**: Provide endpoint lists for testing scripts, RAG service configuration
+- **LitServe RAG Architect**: Coordinate on RAG endpoint contracts, error responses
 
 ## Key Metrics
 - All endpoints have proper validation

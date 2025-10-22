@@ -17,6 +17,7 @@ import { User, ApplicationRole } from '../../entities/user.entity';
 import { CreateFactDto } from './dto/create-fact.dto';
 import { UpdateFactDto } from './dto/update-fact.dto';
 import { AddSupportDto } from './dto/add-support.dto';
+import { RagEmbeddingService } from '../../rag/rag-embedding.service';
 
 @Injectable()
 export class FactService {
@@ -29,6 +30,7 @@ export class FactService {
     private readonly projectRepository: Repository<Project>,
     @InjectRepository(ProjectMember)
     private readonly projectMemberRepository: Repository<ProjectMember>,
+    private readonly ragEmbeddingService: RagEmbeddingService,
   ) {}
 
   async findAll(
@@ -201,7 +203,15 @@ export class FactService {
       meta,
     });
 
-    return this.factRepository.save(fact);
+    const savedFact = await this.factRepository.save(fact);
+
+    // Trigger embedding asynchronously (fire-and-forget)
+    // Only if fact has a statement
+    if (savedFact.statement && savedFact.statement.trim() !== '') {
+      this.ragEmbeddingService.processFactEmbedding(savedFact.id);
+    }
+
+    return savedFact;
   }
 
   async update(
@@ -314,8 +324,24 @@ export class FactService {
       }
     }
 
+    // Track if statement changed for embedding
+    const statementChanged =
+      updateFactDto.statement !== undefined &&
+      updateFactDto.statement !== fact.statement;
+
     Object.assign(fact, updateFactDto);
-    return this.factRepository.save(fact);
+    const updatedFact = await this.factRepository.save(fact);
+
+    // Trigger embedding asynchronously if statement changed and has content
+    if (
+      statementChanged &&
+      updatedFact.statement &&
+      updatedFact.statement.trim() !== ''
+    ) {
+      this.ragEmbeddingService.processFactEmbedding(updatedFact.id);
+    }
+
+    return updatedFact;
   }
 
   async remove(id: string, user: User): Promise<void> {
@@ -329,6 +355,9 @@ export class FactService {
     );
 
     await this.factRepository.remove(fact);
+
+    // Cleanup embedding in RAG service
+    this.ragEmbeddingService.deleteFactEmbedding(id);
   }
 
   async addSupport(
