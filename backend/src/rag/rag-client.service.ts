@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import {
@@ -21,9 +26,10 @@ import {
  * - Automatic retry with exponential backoff
  * - Graceful error handling
  * - Timeout management
+ * - Automatic health monitoring with periodic checks
  */
 @Injectable()
-export class RagClientService {
+export class RagClientService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RagClientService.name);
   private readonly httpClient: AxiosInstance;
   private readonly baseUrl: string;
@@ -37,6 +43,11 @@ export class RagClientService {
   // Retry configuration
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_RETRY_DELAY = 1000; // 1 second
+
+  // Health monitoring
+  private readonly HEALTH_CHECK_INTERVAL = 60000; // 60 seconds
+  private healthCheckTimer?: ReturnType<typeof setInterval>;
+  private lastHealthStatus: 'healthy' | 'unavailable' | 'unknown' = 'unknown';
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>(
@@ -157,15 +168,12 @@ export class RagClientService {
       return this.createDisabledError('healthCheck');
     }
 
-    return this.executeWithRetry(
-      async () => {
-        const response = await this.httpClient.get<HealthResponse>('/health', {
-          timeout: this.HEALTH_TIMEOUT,
-        });
-        return response.data;
-      },
-      'healthCheck',
-    );
+    return this.executeWithRetry(async () => {
+      const response = await this.httpClient.get<HealthResponse>('/health', {
+        timeout: this.HEALTH_TIMEOUT,
+      });
+      return response.data;
+    }, 'healthCheck');
   }
 
   /**
@@ -248,7 +256,8 @@ export class RagClientService {
     }
 
     if (error.response) {
-      const responseData = error.response.data as any;
+      const responseData = error.response.data as RagClientError;
+
       return {
         message: responseData?.message || error.message || 'RAG service error',
         code: `HTTP_${error.response.status}`,
@@ -284,6 +293,90 @@ export class RagClientService {
    * Check if a response is an error
    */
   isError(response: any): response is RagClientError {
-    return response && 'code' in response && 'message' in response;
+    return Boolean(response && 'code' in response && 'message' in response);
+  }
+
+  /**
+   * Lifecycle hook: Initialize health monitoring on module start
+   */
+  async onModuleInit() {
+    if (!this.enabled) {
+      this.logger.log('RAG service is disabled - skipping health monitoring');
+      return;
+    }
+
+    this.logger.log('Starting RAG service health monitoring');
+
+    // Perform initial health check
+    await this.performHealthCheck();
+
+    // Set up periodic health checks
+    this.healthCheckTimer = setInterval(() => {
+      this.performHealthCheck().catch(() => {
+        this.logger.error('Error performing health check');
+      });
+    }, this.HEALTH_CHECK_INTERVAL);
+  }
+
+  /**
+   * Lifecycle hook: Clean up health monitoring on module destroy
+   */
+  onModuleDestroy() {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.logger.log('RAG service health monitoring stopped');
+    }
+  }
+
+  /**
+   * Perform a health check and log only on state changes
+   */
+  private async performHealthCheck(): Promise<void> {
+    try {
+      const response = await this.httpClient.get<HealthResponse>('/health', {
+        timeout: this.HEALTH_TIMEOUT,
+      });
+
+      const isHealthy = response.data.status === 'healthy';
+      const newStatus: 'healthy' | 'unavailable' = isHealthy
+        ? 'healthy'
+        : 'unavailable';
+
+      // Log only on state change
+      if (this.lastHealthStatus !== newStatus) {
+        if (newStatus === 'unavailable') {
+          this.logger.warn(
+            `RAG service is unavailable: ${response.data.status} (ChromaDB: ${response.data.chromadb})`,
+          );
+        } else if (this.lastHealthStatus === 'unavailable') {
+          // Log recovery
+          this.logger.log('RAG service is now available');
+        }
+        this.lastHealthStatus = newStatus;
+      }
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      // Only log if transitioning from healthy/unknown to unavailable
+      if (this.lastHealthStatus !== 'unavailable') {
+        if (axiosError.code === 'ECONNREFUSED') {
+          this.logger.warn(
+            `RAG service is unavailable: Cannot connect to ${this.baseUrl}`,
+          );
+        } else if (
+          axiosError.code === 'ETIMEDOUT' ||
+          axiosError.code === 'ECONNABORTED'
+        ) {
+          this.logger.warn(
+            `RAG service is unavailable: Connection timeout to ${this.baseUrl}`,
+          );
+        } else {
+          this.logger.warn(
+            `RAG service is unavailable: ${axiosError.message || 'Unknown error'}`,
+          );
+        }
+        this.lastHealthStatus = 'unavailable';
+      }
+    }
   }
 }

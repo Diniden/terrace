@@ -104,6 +104,7 @@ def create_provider_from_config(config) -> EmbeddingProvider:
         kwargs["api_key"] = config.OPENAI_API_KEY
     elif provider_type == "ollama":
         kwargs["host"] = config.OLLAMA_HOST
+        kwargs["model_name"] = config.OLLAMA_MODEL
     elif provider_type == "local":
         kwargs["model_name"] = config.LOCAL_MODEL_NAME
 

@@ -13,7 +13,7 @@ import logging
 import json
 import sys
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import litserve as ls
 import chromadb
 from chromadb.config import Settings
@@ -37,9 +37,11 @@ class EmbedRequest(BaseModel):
     """Request model for embedding a fact."""
     fact_id: str = Field(..., description="UUID of the fact")
     statement: str = Field(..., description="Fact statement to embed")
-    context_id: Optional[str] = Field(None, description="Optional context UUID")
+    context_id: Optional[str] = Field(
+        None, description="Optional context UUID")
 
-    @validator('statement')
+    @field_validator('statement')
+    @classmethod
     def statement_not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Statement cannot be empty')
@@ -56,13 +58,15 @@ class EmbedResponse(BaseModel):
 class SearchRequest(BaseModel):
     """Request model for semantic search."""
     query: str = Field(..., description="Natural language query")
-    limit: int = Field(10, description="Maximum number of results", ge=1, le=100)
+    limit: int = Field(
+        10, description="Maximum number of results", ge=1, le=100)
     context_ids: Optional[List[str]] = Field(
         None,
         description="Optional list of context IDs to filter results"
     )
 
-    @validator('query')
+    @field_validator('query')
+    @classmethod
     def query_not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Query cannot be empty')
@@ -110,14 +114,16 @@ class RAGServiceAPI(ls.LitAPI):
         # Validate configuration
         try:
             config.validate()
-            logger.info(f"Configuration validated for provider: {config.EMBEDDING_PROVIDER}")
+            logger.info(
+                f"Configuration validated for provider: {config.EMBEDDING_PROVIDER}")
         except Exception as e:
             logger.error(f"Configuration validation failed: {e}")
             raise
 
         # Initialize embedding provider
         try:
-            self.provider: EmbeddingProvider = create_provider_from_config(config)
+            self.provider: EmbeddingProvider = create_provider_from_config(
+                config)
             logger.info(
                 f"Initialized embedding provider: {self.provider.get_provider_name()}"
             )
@@ -196,7 +202,8 @@ class RAGServiceAPI(ls.LitAPI):
                     "status_code": 404
                 }
         except Exception as e:
-            logger.error(f"Error handling request for {endpoint}: {e}", exc_info=True)
+            logger.error(
+                f"Error handling request for {endpoint}: {e}", exc_info=True)
             return {
                 "error": str(e),
                 "status_code": 500
@@ -304,7 +311,8 @@ class RAGServiceAPI(ls.LitAPI):
                     # ChromaDB returns distances, convert to similarity scores
                     # Lower distance = higher similarity
                     distance = results["distances"][0][i]
-                    score = 1.0 / (1.0 + distance)  # Convert to similarity score
+                    # Convert to similarity score
+                    score = 1.0 / (1.0 + distance)
 
                     search_results.append(
                         SearchResult(
@@ -371,25 +379,138 @@ class RAGServiceAPI(ls.LitAPI):
             }
 
 
+def verify_ollama_health(provider: EmbeddingProvider) -> bool:
+    """
+    Verify Ollama is healthy and ready to serve embeddings.
+
+    Args:
+        provider: The embedding provider instance
+
+    Returns:
+        True if healthy, False otherwise
+    """
+    import requests
+
+    try:
+        # Check if provider is OllamaProvider
+        if provider.get_provider_name() != "ollama":
+            return True  # Not Ollama, skip check
+
+        # Get host from provider
+        host = provider.host if hasattr(
+            provider, 'host') else config.OLLAMA_HOST
+        model = provider.model if hasattr(
+            provider, 'model') else config.OLLAMA_MODEL
+
+        logger.info("=" * 70)
+        logger.info("Verifying Ollama health...")
+        logger.info(f"  Host: {host}")
+        logger.info(f"  Model: {model}")
+
+        # Test 1: Check if Ollama API is reachable
+        logger.info("  [1/3] Testing API connectivity...")
+        response = requests.get(f"{host}/api/tags", timeout=5)
+        response.raise_for_status()
+        logger.info("  ✓ API is reachable")
+
+        # Test 2: Verify model is available
+        logger.info("  [2/3] Verifying model availability...")
+        models_data = response.json()
+        available_models = [m["name"].split(":")[0]
+                            for m in models_data.get("models", [])]
+
+        if model not in available_models:
+            logger.error(f"  ✗ Model '{model}' not found on Ollama instance")
+            logger.error(
+                f"  Available models: {', '.join(available_models) if available_models else 'none'}")
+            logger.error(f"  Pull the model with: ollama pull {model}")
+            return False
+
+        logger.info(f"  ✓ Model '{model}' is available")
+
+        # Test 3: Generate a test embedding
+        logger.info("  [3/3] Testing embedding generation...")
+        test_embedding = provider.embed("health check test")
+        dimension = len(test_embedding)
+        logger.info(
+            f"  ✓ Successfully generated test embedding (dimension: {dimension})")
+
+        logger.info("=" * 70)
+        logger.info("✓ Ollama is healthy and ready!")
+        logger.info("=" * 70)
+
+        return True
+
+    except requests.exceptions.ConnectionError as e:
+        logger.error("=" * 70)
+        logger.error("✗ OLLAMA CONNECTION FAILED")
+        logger.error(f"  Could not connect to Ollama at {host}")
+        logger.error("  Is Ollama running? Start it with: ollama serve")
+        logger.error("=" * 70)
+        return False
+
+    except requests.exceptions.Timeout as e:
+        logger.error("=" * 70)
+        logger.error("✗ OLLAMA CONNECTION TIMEOUT")
+        logger.error(f"  Ollama at {host} is not responding")
+        logger.error("  Check if Ollama is running: ollama serve")
+        logger.error("=" * 70)
+        return False
+
+    except Exception as e:
+        logger.error("=" * 70)
+        logger.error("✗ OLLAMA HEALTH CHECK FAILED")
+        logger.error(f"  Error: {str(e)}")
+        logger.error("=" * 70)
+        logger.exception("Detailed error:")
+        return False
+
+
 def main():
     """Main entry point for the RAG service."""
     logger.info("Starting RAG service...")
     logger.info(f"Provider: {config.EMBEDDING_PROVIDER}")
     logger.info(f"ChromaDB: {config.CHROMA_HOST}:{config.CHROMA_PORT}")
 
+    # Log Ollama configuration if using Ollama provider
+    if config.EMBEDDING_PROVIDER.lower() == "ollama":
+        logger.info(f"Ollama Host: {config.OLLAMA_HOST}")
+        logger.info(f"Ollama Model: {config.OLLAMA_MODEL}")
+
+    # Validate configuration early
+    try:
+        config.validate()
+    except Exception as e:
+        logger.error(f"Configuration validation failed: {e}")
+        sys.exit(1)
+
+    # Create provider early to run health checks
+    try:
+        provider = create_provider_from_config(config)
+
+        # Run Ollama health check if using Ollama provider
+        if config.EMBEDDING_PROVIDER.lower() == "ollama":
+            if not verify_ollama_health(provider):
+                logger.error("Exiting due to Ollama health check failure")
+                sys.exit(1)
+
+    except Exception as e:
+        logger.error(f"Failed to initialize provider: {e}")
+        sys.exit(1)
+
     # Create LitServe API
-    api = RAGServiceAPI()
+    api = RAGServiceAPI(api_path="/")
 
     # Create server with multiple endpoint support
     server = ls.LitServer(
         api,
         accelerator="cpu",  # Embeddings typically run on CPU
-        api_path="/",
         timeout=config.REQUEST_TIMEOUT,
     )
 
     # Start server
-    logger.info(f"Server starting on {config.SERVICE_HOST}:{config.SERVICE_PORT}")
+    logger.info(
+        f"Server starting on {config.SERVICE_HOST}:{config.SERVICE_PORT}")
     server.run(
         port=config.SERVICE_PORT,
         host=config.SERVICE_HOST,

@@ -18,13 +18,14 @@ procs:
       COMPOSE_PROJECT_NAME: terrace
 
   rag-service:
-    shell: "python/venv/bin/python python/rag_service.py"
+    shell: "python/venv/bin/python3 python/rag_service.py"
     cwd: "."
     env:
       CHROMA_HOST: localhost
       CHROMA_PORT: "8000"
-      EMBEDDING_PROVIDER: local
-      SERVICE_HOST: 0.0.0.0
+      EMBEDDING_PROVIDER: ollama
+      OLLAMA_HOST: http://192.168.1.6:11434
+      OLLAMA_MODEL: nomic-embed-text
       SERVICE_PORT: "8001"
       LOG_LEVEL: INFO
       NODE_ENV: development

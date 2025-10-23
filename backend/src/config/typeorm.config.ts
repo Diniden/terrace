@@ -15,7 +15,8 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   database: process.env.DATABASE_NAME || 'terrace',
   entities: [User, Project, ProjectMember, Corpus, Fact, ChatMessage],
   synchronize: process.env.NODE_ENV === 'development',
-  logging: process.env.NODE_ENV === 'development',
+  // logging: process.env.NODE_ENV === 'development',
+  logging: false,
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   // Run migrations after synchronize in development
   // In production, set synchronize to false and migrationsRun to true

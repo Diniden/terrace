@@ -56,6 +56,8 @@ source venv/bin/activate
 
 # Install dependencies
 pip3 install -r requirements.txt
+
+# Go to torch documentation for installing torch correctly on your machine
 ```
 
 ### 2. Start ChromaDB
@@ -105,6 +107,7 @@ The service will start on `http://localhost:8080`
 Embed a fact statement into the vector database.
 
 **Request:**
+
 ```json
 {
   "fact_id": "fact-uuid-001",
@@ -114,6 +117,7 @@ Embed a fact statement into the vector database.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -123,6 +127,7 @@ Embed a fact statement into the vector database.
 ```
 
 **Example:**
+
 ```bash
 curl -X POST http://localhost:8080/embed \
   -H "Content-Type: application/json" \
@@ -138,6 +143,7 @@ curl -X POST http://localhost:8080/embed \
 Perform semantic search to find similar facts.
 
 **Request:**
+
 ```json
 {
   "query": "How long does Earth take to orbit the Sun?",
@@ -147,6 +153,7 @@ Perform semantic search to find similar facts.
 ```
 
 **Response:**
+
 ```json
 {
   "results": [
@@ -160,6 +167,7 @@ Perform semantic search to find similar facts.
 ```
 
 **Example:**
+
 ```bash
 curl -X POST http://localhost:8080/search \
   -H "Content-Type: application/json" \
@@ -174,6 +182,7 @@ curl -X POST http://localhost:8080/search \
 Check service health and configuration.
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -184,6 +193,7 @@ Check service health and configuration.
 ```
 
 **Example:**
+
 ```bash
 curl http://localhost:8080/health
 ```
@@ -195,12 +205,14 @@ curl http://localhost:8080/health
 Uses sentence-transformers for local embedding generation. No API keys required.
 
 **Configuration:**
+
 ```bash
 EMBEDDING_PROVIDER=local
 LOCAL_MODEL_NAME=all-MiniLM-L6-v2
 ```
 
 **Recommended Models:**
+
 - `all-MiniLM-L6-v2`: Fast, lightweight (384 dimensions, ~80MB)
 - `all-mpnet-base-v2`: Better quality (768 dimensions, ~420MB)
 - `paraphrase-multilingual-MiniLM-L12-v2`: Multilingual support
@@ -210,12 +222,14 @@ LOCAL_MODEL_NAME=all-MiniLM-L6-v2
 Uses OpenAI's embedding API. Requires API key.
 
 **Configuration:**
+
 ```bash
 EMBEDDING_PROVIDER=openai
 OPENAI_API_KEY=your-api-key-here
 ```
 
 **Models:**
+
 - `text-embedding-3-small`: 1536 dimensions (default)
 - `text-embedding-3-large`: 3072 dimensions
 
@@ -224,6 +238,7 @@ OPENAI_API_KEY=your-api-key-here
 Uses Anthropic's Claude API. This is a demonstration implementation using Claude's text generation for embeddings.
 
 **Configuration:**
+
 ```bash
 EMBEDDING_PROVIDER=claude
 ANTHROPIC_API_KEY=your-api-key-here
@@ -236,12 +251,14 @@ ANTHROPIC_API_KEY=your-api-key-here
 Connects to an Ollama instance (local or remote) for embedding generation.
 
 **Configuration:**
+
 ```bash
 EMBEDDING_PROVIDER=ollama
 OLLAMA_HOST=http://localhost:11434
 ```
 
 **Setup Ollama:**
+
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -285,20 +302,20 @@ tests/test_endpoints.py::TestRAGServiceEndpoints::test_search_endpoint PASSED
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `EMBEDDING_PROVIDER` | `local` | Provider type: claude, openai, ollama, local |
-| `ANTHROPIC_API_KEY` | - | API key for Claude provider |
-| `OPENAI_API_KEY` | - | API key for OpenAI provider |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama instance URL |
-| `LOCAL_MODEL_NAME` | `all-MiniLM-L6-v2` | HuggingFace model for local provider |
-| `CHROMA_HOST` | `localhost` | ChromaDB host |
-| `CHROMA_PORT` | `8000` | ChromaDB port |
-| `CHROMA_PERSIST_DIRECTORY` | `./chroma_db` | Local persistence directory |
-| `SERVICE_HOST` | `0.0.0.0` | Service bind address |
-| `SERVICE_PORT` | `8080` | Service port |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `REQUEST_TIMEOUT` | `30` | Request timeout in seconds |
+| Variable                   | Default                  | Description                                  |
+| -------------------------- | ------------------------ | -------------------------------------------- |
+| `EMBEDDING_PROVIDER`       | `local`                  | Provider type: claude, openai, ollama, local |
+| `ANTHROPIC_API_KEY`        | -                        | API key for Claude provider                  |
+| `OPENAI_API_KEY`           | -                        | API key for OpenAI provider                  |
+| `OLLAMA_HOST`              | `http://localhost:11434` | Ollama instance URL                          |
+| `LOCAL_MODEL_NAME`         | `all-MiniLM-L6-v2`       | HuggingFace model for local provider         |
+| `CHROMA_HOST`              | `localhost`              | ChromaDB host                                |
+| `CHROMA_PORT`              | `8000`                   | ChromaDB port                                |
+| `CHROMA_PERSIST_DIRECTORY` | `./chroma_db`            | Local persistence directory                  |
+| `SERVICE_HOST`             | `0.0.0.0`                | Service bind address                         |
+| `SERVICE_PORT`             | `8080`                   | Service port                                 |
+| `LOG_LEVEL`                | `INFO`                   | Logging level                                |
+| `REQUEST_TIMEOUT`          | `30`                     | Request timeout in seconds                   |
 
 ## Project Structure
 
@@ -337,6 +354,7 @@ docker logs <chromadb-container-id>
 ### Local Model Download Issues
 
 Local models are downloaded from HuggingFace on first use. Ensure you have:
+
 - Internet connection
 - Sufficient disk space (~80MB-500MB per model)
 - Write permissions in the cache directory
@@ -356,6 +374,7 @@ python3 -c "from config import config; config.validate()"
 ### Memory Issues with Large Models
 
 Local models require RAM:
+
 - `all-MiniLM-L6-v2`: ~500MB RAM
 - `all-mpnet-base-v2`: ~1.5GB RAM
 
@@ -365,12 +384,12 @@ Use smaller models or cloud providers if memory is limited.
 
 ### Embedding Generation
 
-| Provider | Latency | Cost | Quality |
-|----------|---------|------|---------|
-| Local | 50-200ms | Free | Good |
-| OpenAI | 100-300ms | $0.02/1M tokens | Excellent |
-| Ollama | 100-500ms | Free | Good |
-| Claude | 500-1500ms | $3/1M tokens | Good (workaround) |
+| Provider | Latency    | Cost            | Quality           |
+| -------- | ---------- | --------------- | ----------------- |
+| Local    | 50-200ms   | Free            | Good              |
+| OpenAI   | 100-300ms  | $0.02/1M tokens | Excellent         |
+| Ollama   | 100-500ms  | Free            | Good              |
+| Claude   | 500-1500ms | $3/1M tokens    | Good (workaround) |
 
 ### Scaling
 
@@ -400,6 +419,7 @@ CMD ["python3", "rag_service.py"]
 ```
 
 Build and run:
+
 ```bash
 docker build -t rag-service .
 docker run -p 8080:8080 --env-file .env rag-service
@@ -416,6 +436,7 @@ This project is part of the Terrace platform.
 ## Support
 
 For issues and questions:
+
 - Check the troubleshooting section
 - Review test files for usage examples
 - Consult provider documentation for API-specific issues

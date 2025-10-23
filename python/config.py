@@ -21,6 +21,7 @@ class Config:
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "nomic-embed-text")
     LOCAL_MODEL_NAME: str = os.getenv("LOCAL_MODEL_NAME", "all-MiniLM-L6-v2")
 
     # ChromaDB configuration
@@ -88,7 +89,7 @@ class Config:
         elif provider == "openai":
             return "text-embedding-3-small"
         elif provider == "ollama":
-            return "nomic-embed-text"
+            return cls.OLLAMA_MODEL
         elif provider == "local":
             return cls.LOCAL_MODEL_NAME
         else:

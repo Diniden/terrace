@@ -11,6 +11,7 @@ import { CorpusModule } from './modules/corpus/corpus.module';
 import { FactModule } from './modules/fact/fact.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { RagModule } from './rag/rag.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ChatModule } from './modules/chat/chat.module';
       envFilePath: ['.env.local', '.env'],
     }),
     TypeOrmModule.forRoot(typeOrmConfig),
+    RagModule, // Initialize RAG service health monitoring
     AuthModule,
     UserModule,
     ProjectModule,

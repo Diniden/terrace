@@ -26,7 +26,7 @@ services:
     container_name: terrace-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks:
       - terrace-network
     depends_on:
@@ -38,7 +38,7 @@ services:
       ADMINER_DEFAULT_DB: ${POSTGRES_DB:-terrace}
 
   chromadb:
-    image: chromadb/chroma:0.4.22
+    image: chromadb/chroma
     container_name: terrace-chromadb
     restart: unless-stopped
     ports:
