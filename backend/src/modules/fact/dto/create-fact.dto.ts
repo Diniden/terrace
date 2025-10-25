@@ -66,4 +66,16 @@ export class CreateFactDto {
   @IsObject()
   @IsOptional()
   meta?: Record<string, any>;
+
+  @ApiProperty({
+    description:
+      'UUID of an existing fact that this new fact will support. ' +
+      'Creates a support relationship immediately upon fact creation. ' +
+      'The target fact must exist and be in the same corpus with matching context.',
+    format: 'uuid',
+    required: false,
+  })
+  @IsUUID()
+  @IsOptional()
+  supportedById?: string;
 }

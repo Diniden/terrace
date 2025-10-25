@@ -72,22 +72,23 @@ describe('RAG API (e2e)', () => {
     const factRepository = dataSource.getRepository(Fact);
 
     const fact1 = factRepository.create({
-      statement: 'Quantum mechanics describes the behavior of matter at atomic scales',
+      statement:
+        'Quantum mechanics describes the behavior of matter at atomic scales',
       corpusId: testCorpus.id,
       context: FactContext.CORPUS_KNOWLEDGE,
       state: FactState.READY,
     });
 
     const fact2 = factRepository.create({
-      statement: 'Entanglement is a quantum phenomenon where particles remain correlated',
+      statement:
+        'Entanglement is a quantum phenomenon where particles remain correlated',
       corpusId: testCorpus.id,
       context: FactContext.CORPUS_KNOWLEDGE,
       state: FactState.READY,
     });
 
     const fact3 = factRepository.create({
-      statement:
-        'The wave function describes the quantum state of a system',
+      statement: 'The wave function describes the quantum state of a system',
       corpusId: testCorpus.id,
       context: FactContext.CORPUS_KNOWLEDGE,
       state: FactState.READY,
@@ -235,7 +236,9 @@ describe('RAG API (e2e)', () => {
             expect(res.body[0]).toHaveProperty('score');
             expect(res.body[0]).toHaveProperty('matchedStatement');
             // Source fact should not be in results
-            expect(res.body.find((r) => r.fact.id === sourceFact.id)).toBeUndefined();
+            expect(
+              res.body.find((r) => r.fact.id === sourceFact.id),
+            ).toBeUndefined();
           }
         });
     });

@@ -22,7 +22,9 @@ export class CreateChatMessages1729519500000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_chat_messages_user_created;`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_chat_messages_user_created;`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS chat_messages;`);
   }
 }

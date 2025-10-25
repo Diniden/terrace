@@ -63,10 +63,7 @@ export class AdminController {
   }
 
   @Delete('models/:modelName/:id')
-  async delete(
-    @Param('modelName') modelName: string,
-    @Param('id') id: string,
-  ) {
+  async delete(@Param('modelName') modelName: string, @Param('id') id: string) {
     await this.adminService.delete(modelName, id);
     return { success: true };
   }

@@ -53,7 +53,11 @@ export class FactController {
 
   @Get()
   @ApiOperation({ summary: 'Get all facts with pagination' })
-  @ApiQuery({ name: 'corpusId', required: false, description: 'Filter by corpus ID' })
+  @ApiQuery({
+    name: 'corpusId',
+    required: false,
+    description: 'Filter by corpus ID',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Facts retrieved successfully' })
@@ -72,6 +76,29 @@ export class FactController {
   @ApiResponse({ status: 404, description: 'Fact not found' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.factService.findOne(id, user);
+  }
+
+  @Get(':id/relationships')
+  @ApiOperation({
+    summary: 'Get a fact with all relationship context',
+    description:
+      'Retrieves a fact with complete relationship information including: ' +
+      'basis (parent fact), supports (facts this supports), supportedBy (facts supporting this), ' +
+      'dependentFacts (facts that use this as basis), and corpus details.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Fact with all relationships retrieved successfully. ' +
+      'Includes basis, supports, supportedBy, dependentFacts, and corpus.',
+  })
+  @ApiResponse({ status: 404, description: 'Fact not found' })
+  @ApiResponse({ status: 403, description: 'Access denied to this project' })
+  async findOneWithRelationships(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.findOneWithRelationships(id, user);
   }
 
   @Post()
@@ -278,7 +305,8 @@ export class FactController {
   @ApiTags('admin')
   @ApiOperation({
     summary: 'Manually trigger fact re-embedding (Admin)',
-    description: 'Forces re-embedding of a specific fact. Useful for recovery or model updates.',
+    description:
+      'Forces re-embedding of a specific fact. Useful for recovery or model updates.',
   })
   @ApiResponse({
     status: 200,
@@ -308,9 +336,7 @@ export class FactController {
       const fact = await this.factService.findOne(id, user);
 
       if (!fact.statement || fact.statement.trim() === '') {
-        throw new BadRequestException(
-          'Cannot embed fact without statement',
-        );
+        throw new BadRequestException('Cannot embed fact without statement');
       }
 
       // Trigger embedding
@@ -418,7 +444,8 @@ export class FactController {
   @ApiTags('admin')
   @ApiOperation({
     summary: 'Check RAG service health (Admin)',
-    description: 'Returns health status of the RAG service and its dependencies.',
+    description:
+      'Returns health status of the RAG service and its dependencies.',
   })
   @ApiResponse({
     status: 200,

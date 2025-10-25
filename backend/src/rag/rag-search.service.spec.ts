@@ -324,9 +324,7 @@ describe('RagSearchService', () => {
     it('should truncate long statements to 100 characters', async () => {
       const longStatement = 'A'.repeat(200) + '.';
       const searchResponse = {
-        results: [
-          { fact_id: 'fact-1', score: 0.1, statement: longStatement },
-        ],
+        results: [{ fact_id: 'fact-1', score: 0.1, statement: longStatement }],
       };
 
       ragClient.isEnabled.mockReturnValue(true);

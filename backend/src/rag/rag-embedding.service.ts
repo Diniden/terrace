@@ -37,9 +37,9 @@ export class RagEmbeddingService {
    *
    * @param factId The ID of the fact to embed
    */
-  async processFactEmbedding(factId: string): Promise<void> {
+  processFactEmbedding(factId: string) {
     // Fire-and-forget: don't await, don't block
-    this.embedFactAsync(factId).catch((error) => {
+    this.embedFactAsync(factId).catch((error: Error) => {
       this.logger.error(
         `Unhandled error in processFactEmbedding for fact ${factId}: ${error.message}`,
         error.stack,
@@ -67,7 +67,9 @@ export class RagEmbeddingService {
 
       // Only embed if there's a statement
       if (!fact.statement || fact.statement.trim() === '') {
-        this.logger.debug(`Fact ${factId} has no statement, skipping embedding`);
+        this.logger.debug(
+          `Fact ${factId} has no statement, skipping embedding`,
+        );
         return;
       }
 
@@ -101,11 +103,15 @@ export class RagEmbeddingService {
         await this.markEmbeddingSucceeded(factId);
       }
     } catch (error) {
-      this.logger.error(
-        `Error embedding fact ${factId}: ${error.message}`,
-        error.stack,
-      );
-      await this.markEmbeddingFailed(factId, error.message);
+      if (error instanceof Error) {
+        this.logger.error(
+          `Error embedding fact ${factId}: ${error.message}`,
+          error.stack,
+        );
+        await this.markEmbeddingFailed(factId, error.message);
+      } else {
+        this.logger.error(`Error embedding fact ${factId}: ${error}`);
+      }
     }
   }
 
@@ -121,9 +127,15 @@ export class RagEmbeddingService {
         embeddingModel: 'openai-text-embedding-3-small', // Model identifier
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to update embedding status for fact ${factId}: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        this.logger.error(
+          `Failed to update embedding status for fact ${factId}: ${error.message}`,
+        );
+      } else {
+        this.logger.error(
+          `Failed to update embedding status for fact ${factId}: ${error}`,
+        );
+      }
     }
   }
 
@@ -144,7 +156,7 @@ export class RagEmbeddingService {
         return;
       }
 
-      const updatedMeta = {
+      const updatedMeta: Record<string, any> = {
         ...fact.meta,
         embeddingError: errorMessage,
         embeddingFailedAt: new Date().toISOString(),
@@ -152,12 +164,18 @@ export class RagEmbeddingService {
 
       await this.factRepository.update(factId, {
         embeddingStatus: EmbeddingStatus.FAILED,
-        meta: updatedMeta as any,
+        meta: updatedMeta,
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to mark embedding as failed for fact ${factId}: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        this.logger.error(
+          `Failed to mark embedding as failed for fact ${factId}: ${error.message}`,
+        );
+      } else {
+        this.logger.error(
+          `Failed to mark embedding as failed for fact ${factId}: ${error}`,
+        );
+      }
     }
   }
 
@@ -193,10 +211,14 @@ export class RagEmbeddingService {
         this.processFactEmbedding(fact.id);
       }
     } catch (error) {
-      this.logger.error(
-        `Error processing pending embeddings: ${error.message}`,
-        error.stack,
-      );
+      if (error instanceof Error) {
+        this.logger.error(
+          `Error processing pending embeddings: ${error.message}`,
+          error.stack,
+        );
+      } else {
+        this.logger.error(`Error processing pending embeddings: ${error}`);
+      }
     }
   }
 
@@ -232,10 +254,14 @@ export class RagEmbeddingService {
         this.processFactEmbedding(fact.id);
       }
     } catch (error) {
-      this.logger.error(
-        `Error retrying failed embeddings: ${error.message}`,
-        error.stack,
-      );
+      if (error instanceof Error) {
+        this.logger.error(
+          `Error retrying failed embeddings: ${error.message}`,
+          error.stack,
+        );
+      } else {
+        this.logger.error(`Error retrying failed embeddings: ${error}`);
+      }
     }
   }
 
@@ -246,7 +272,7 @@ export class RagEmbeddingService {
    *
    * @param factId The ID of the fact to delete embedding for
    */
-  async deleteFactEmbedding(factId: string): Promise<void> {
+  deleteFactEmbedding(factId: string) {
     // Note: The Python RAG service should expose a DELETE /embed/:fact_id endpoint
     // For now, we'll just log that this should be done
     this.logger.warn(

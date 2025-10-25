@@ -124,10 +124,7 @@ export class RagSearchService {
 
       return results;
     } catch (error) {
-      this.logger.error(
-        `Error searching facts: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Error searching facts: ${error.message}`, error.stack);
       return [];
     }
   }

@@ -8,7 +8,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Corpus } from '../../entities/corpus.entity';
 import { Project } from '../../entities/project.entity';
-import { ProjectMember, ProjectRole } from '../../entities/project-member.entity';
+import {
+  ProjectMember,
+  ProjectRole,
+} from '../../entities/project-member.entity';
 import { User, ApplicationRole } from '../../entities/user.entity';
 import { CreateCorpusDto } from './dto/create-corpus.dto';
 import { UpdateCorpusDto } from './dto/update-corpus.dto';
@@ -103,7 +106,8 @@ export class CorpusService {
       if (existingCorpuses.length > 0) {
         // Find the corpus with no children (tail of the chain)
         const tailCorpus = existingCorpuses.find(
-          corpus => !corpus.dependentCorpuses || corpus.dependentCorpuses.length === 0
+          (corpus) =>
+            !corpus.dependentCorpuses || corpus.dependentCorpuses.length === 0,
         );
 
         if (tailCorpus) {

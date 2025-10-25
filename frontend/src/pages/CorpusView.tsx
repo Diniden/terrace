@@ -1,16 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { corpusesApi } from '../api/corpuses';
-import { factsApi } from '../api/facts';
-import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/common/Button';
-import { Spinner } from '../components/common/Spinner';
-import { PageHeader } from '../components/common/PageHeader';
-import { PageFooter } from '../components/common/PageFooter';
-import { FactCard } from '../components/user/FactCard';
-import type { Corpus, Fact, FactState, FactContext } from '../types';
-import { FactContext as FactContextEnum, FactState as FactStateEnum } from '../types';
-import './CorpusView.css';
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { corpusesApi } from "../api/corpuses";
+import { factsApi } from "../api/facts";
+import { useAuth } from "../context/AuthContext";
+import { Button } from "../components/common/Button";
+import { Spinner } from "../components/common/Spinner";
+import { PageHeader } from "../components/common/PageHeader";
+import { PageFooter } from "../components/common/PageFooter";
+import { FactCard } from "../components/user/FactCard";
+import { FactStack } from "../components/user/FactStack";
+import { computeFactStacks } from "../utils/factStackUtils";
+import type { Corpus, Fact, FactState } from "../types";
+import {
+  FactContext as FactContextEnum,
+  FactState as FactStateEnum,
+} from "../types";
+import "./CorpusView.css";
 
 export const CorpusView: React.FC = () => {
   const { corpusId } = useParams<{ corpusId: string }>();
@@ -21,9 +26,17 @@ export const CorpusView: React.FC = () => {
   const [facts, setFacts] = useState<Fact[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [corpusName, setCorpusName] = useState('');
-  const [llmInput, setLlmInput] = useState('');
+  const [corpusName, setCorpusName] = useState("");
+  const [llmInput, setLlmInput] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [knowledgeColumnCount, setKnowledgeColumnCount] = useState(1);
+  const [stackViewByRegion, setStackViewByRegion] = useState<
+    Record<"knowledge" | "global" | "builder", boolean>
+  >({
+    knowledge: false,
+    global: false,
+    builder: false,
+  });
 
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const llmInputRef = useRef<HTMLInputElement | null>(null);
@@ -44,17 +57,17 @@ export const CorpusView: React.FC = () => {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.lang = "en-US";
 
-      let finalTranscript = '';
+      let finalTranscript = "";
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = '';
+        let interimTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
+            finalTranscript += transcript + " ";
           } else {
             interimTranscript += transcript;
           }
@@ -74,7 +87,7 @@ export const CorpusView: React.FC = () => {
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+        console.error("Speech recognition error:", event.error);
         stopListening();
       };
 
@@ -119,9 +132,9 @@ export const CorpusView: React.FC = () => {
       setCorpusName(corpusData.name);
       setFacts(factsData.data);
     } catch (err) {
-      console.error('Failed to load corpus data:', err);
+      console.error("Failed to load corpus data:", err);
       // Redirect to projects page if resource not found
-      navigate('/projects', { replace: true });
+      navigate("/projects", { replace: true });
     } finally {
       setLoading(false);
     }
@@ -130,18 +143,20 @@ export const CorpusView: React.FC = () => {
   const handleUpdateCorpusName = async () => {
     if (!corpusId || !corpusName.trim() || corpusName === corpus?.name) {
       setIsEditingName(false);
-      setCorpusName(corpus?.name || '');
+      setCorpusName(corpus?.name || "");
       return;
     }
 
     try {
-      const updated = await corpusesApi.update(corpusId, { name: corpusName.trim() });
+      const updated = await corpusesApi.update(corpusId, {
+        name: corpusName.trim(),
+      });
       setCorpus(updated);
       setCorpusName(updated.name);
       setIsEditingName(false);
     } catch (err) {
-      console.error('Failed to update corpus name:', err);
-      setCorpusName(corpus?.name || '');
+      console.error("Failed to update corpus name:", err);
+      setCorpusName(corpus?.name || "");
     }
   };
 
@@ -155,7 +170,7 @@ export const CorpusView: React.FC = () => {
       });
       await loadCorpusData();
     } catch (err) {
-      console.error('Failed to create global fact:', err);
+      console.error("Failed to create global fact:", err);
     }
   };
 
@@ -169,7 +184,7 @@ export const CorpusView: React.FC = () => {
       });
       await loadCorpusData();
     } catch (err) {
-      console.error('Failed to create builder fact:', err);
+      console.error("Failed to create builder fact:", err);
     }
   };
 
@@ -183,7 +198,7 @@ export const CorpusView: React.FC = () => {
       });
       await loadCorpusData();
     } catch (err) {
-      console.error('Failed to create knowledge fact:', err);
+      console.error("Failed to create knowledge fact:", err);
     }
   };
 
@@ -191,8 +206,13 @@ export const CorpusView: React.FC = () => {
     id: string,
     data: { statement?: string; state?: FactState }
   ) => {
-    await factsApi.update(id, data);
-    await loadCorpusData();
+    // Update the fact via API and get the updated fact in response
+    const updatedFact = await factsApi.update(id, data);
+
+    // Update local state with the response data instead of reloading all data
+    setFacts((prevFacts) =>
+      prevFacts.map((fact) => (fact.id === id ? updatedFact : fact))
+    );
   };
 
   const startListening = () => {
@@ -218,17 +238,69 @@ export const CorpusView: React.FC = () => {
     }
   };
 
-  const handleBack = () => {
+  const handleBackToProject = () => {
     if (corpus?.projectId) {
       navigate(`/projects/${corpus.projectId}`);
     } else {
-      navigate(-1);
+      navigate("/projects");
     }
   };
 
-  const knowledgeFacts = facts.filter(f => f.context === FactContextEnum.CORPUS_KNOWLEDGE);
-  const globalFacts = facts.filter(f => f.context === FactContextEnum.CORPUS_GLOBAL);
-  const builderFacts = facts.filter(f => f.context === FactContextEnum.CORPUS_BUILDER);
+  const handleExpandKnowledgeColumns = () => {
+    const maxColumns = Math.min(5, knowledgeFacts.length);
+
+    // Loop: if at max, go to 1; otherwise increment
+    const nextCount =
+      knowledgeColumnCount >= maxColumns ? 1 : knowledgeColumnCount + 1;
+    setKnowledgeColumnCount(nextCount);
+  };
+
+  const handleShrinkKnowledgeColumns = () => {
+    const maxColumns = Math.min(5, knowledgeFacts.length);
+
+    // Loop: if at 1, go to max; otherwise decrement
+    const nextCount =
+      knowledgeColumnCount <= 1 ? maxColumns : knowledgeColumnCount - 1;
+    setKnowledgeColumnCount(nextCount);
+  };
+
+  const handleToggleStackView = (
+    region: "knowledge" | "global" | "builder"
+  ) => {
+    setStackViewByRegion((prev) => ({ ...prev, [region]: !prev[region] }));
+  };
+
+  const knowledgeFacts = facts.filter(
+    (f) => f.context === FactContextEnum.CORPUS_KNOWLEDGE
+  );
+  const globalFacts = facts.filter(
+    (f) => f.context === FactContextEnum.CORPUS_GLOBAL
+  );
+  const builderFacts = facts.filter(
+    (f) => f.context === FactContextEnum.CORPUS_BUILDER
+  );
+
+  // Compute fact stacks for each context when stack view is enabled for that region
+  const knowledgeStacks = stackViewByRegion.knowledge
+    ? computeFactStacks(knowledgeFacts)
+    : [];
+  const globalStacks = stackViewByRegion.global
+    ? computeFactStacks(globalFacts)
+    : [];
+  const builderStacks = stackViewByRegion.builder
+    ? computeFactStacks(builderFacts)
+    : [];
+
+  // Debug logging to verify stacks are computed correctly
+  if (stackViewByRegion.knowledge && knowledgeStacks.length > 0) {
+    console.log("Knowledge stacks:", knowledgeStacks);
+  }
+  if (stackViewByRegion.global && globalStacks.length > 0) {
+    console.log("Global stacks:", globalStacks);
+  }
+  if (stackViewByRegion.builder && builderStacks.length > 0) {
+    console.log("Builder stacks:", builderStacks);
+  }
 
   if (loading) {
     return (
@@ -240,7 +312,7 @@ export const CorpusView: React.FC = () => {
 
   if (!corpus) {
     // Redirect to projects page if corpus not found
-    navigate('/projects', { replace: true });
+    navigate("/projects", { replace: true });
     return null;
   }
 
@@ -257,9 +329,9 @@ export const CorpusView: React.FC = () => {
               onChange={(e) => setCorpusName(e.target.value)}
               onBlur={handleUpdateCorpusName}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   handleUpdateCorpusName();
-                } else if (e.key === 'Escape') {
+                } else if (e.key === "Escape") {
                   setIsEditingName(false);
                   setCorpusName(corpus.name);
                 }
@@ -293,15 +365,24 @@ export const CorpusView: React.FC = () => {
         }
         userEmail={userEmail}
         actions={
-          <Button variant="secondary" onClick={handleBack}>
-            ← Back
+          <Button
+            variant="outline"
+            onClick={handleBackToProject}
+            title="Back to Project"
+          >
+            ← Project
           </Button>
         }
       />
 
       <main className="corpusView__body">
         {/* Corpus Column (Knowledge Facts) */}
-        <div className="corpusView__knowledgeColumn">
+        <div
+          className="corpusView__knowledgeColumn"
+          style={{
+            width: `calc(var(--corpus-column-width) * ${knowledgeColumnCount})`,
+          }}
+        >
           <div className="corpusView__regionHeader">Knowledge Base</div>
           <div className="corpusView__knowledgeColumnInner">
             <div className="corpusView__knowledgeColumnContent">
@@ -309,19 +390,170 @@ export const CorpusView: React.FC = () => {
                 <div className="corpusView__emptyState">
                   <p>No knowledge facts yet</p>
                 </div>
+              ) : stackViewByRegion.knowledge ? (
+                <div
+                  className="corpusView__factsList"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${knowledgeColumnCount}, 1fr)`,
+                    gap: "var(--spacing-lg)",
+                    alignItems: "start",
+                  }}
+                >
+                  {knowledgeStacks.map((stack) => (
+                    <FactStack
+                      key={stack.topFact.id}
+                      stack={stack}
+                      onUpdate={handleUpdateFact}
+                      viewContext="corpus"
+                    />
+                  ))}
+                </div>
               ) : (
-                <div className="corpusView__factsList">
+                <div
+                  className="corpusView__factsList"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${knowledgeColumnCount}, 1fr)`,
+                    gap: "var(--spacing-lg)",
+                    alignItems: "start",
+                  }}
+                >
                   {knowledgeFacts.map((fact) => (
                     <FactCard
                       key={fact.id}
                       fact={fact}
                       onUpdate={handleUpdateFact}
+                      viewContext="corpus"
                     />
                   ))}
                 </div>
               )}
             </div>
             <div className="corpusView__knowledgeColumnActions">
+              <Button
+                className="corpusView__stackViewButton"
+                variant="secondary"
+                onClick={() => handleToggleStackView("knowledge")}
+                title={
+                  stackViewByRegion.knowledge
+                    ? "Disable stack view"
+                    : "Enable stack view"
+                }
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Overlapped boxes icon */}
+                  <rect
+                    x="2"
+                    y="6"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                  <rect
+                    x="6"
+                    y="2"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill={stackViewByRegion.knowledge ? "currentColor" : "none"}
+                    fillOpacity={stackViewByRegion.knowledge ? "0.2" : "0"}
+                  />
+                </svg>
+              </Button>
+              <Button
+                className="corpusView__expandColumnsButton"
+                variant="secondary"
+                onClick={handleExpandKnowledgeColumns}
+                title={`Expand columns (${knowledgeColumnCount} of ${Math.min(5, knowledgeFacts.length)})`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M1 8H6"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M3 6L1 8L3 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M15 8H10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M13 6L15 8L13 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Button>
+              <Button
+                className="corpusView__shrinkColumnsButton"
+                variant="secondary"
+                onClick={handleShrinkKnowledgeColumns}
+                title={`Shrink columns (${knowledgeColumnCount} of ${Math.min(5, knowledgeFacts.length)})`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M6 8H1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M4 6L6 8L4 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M10 8H15"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M12 6L10 8L12 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Button>
               <Button
                 className="corpusView__addFactButton"
                 onClick={handleAddKnowledgeFact}
@@ -341,6 +573,17 @@ export const CorpusView: React.FC = () => {
                 <div className="corpusView__emptyState">
                   <p>No global facts yet</p>
                 </div>
+              ) : stackViewByRegion.global ? (
+                <div className="corpusView__factGrid">
+                  {globalStacks.map((stack) => (
+                    <FactStack
+                      key={stack.topFact.id}
+                      stack={stack}
+                      onUpdate={handleUpdateFact}
+                      viewContext="corpus"
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className="corpusView__factGrid">
                   {globalFacts.map((fact) => (
@@ -348,12 +591,54 @@ export const CorpusView: React.FC = () => {
                       key={fact.id}
                       fact={fact}
                       onUpdate={handleUpdateFact}
+                      viewContext="corpus"
                     />
                   ))}
                 </div>
               )}
             </div>
             <div className="corpusView__globalFactsRegionActions">
+              <Button
+                className="corpusView__stackViewButton"
+                variant="secondary"
+                onClick={() => handleToggleStackView("global")}
+                title={
+                  stackViewByRegion.global
+                    ? "Disable stack view"
+                    : "Enable stack view"
+                }
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Overlapped boxes icon */}
+                  <rect
+                    x="2"
+                    y="6"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                  <rect
+                    x="6"
+                    y="2"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill={stackViewByRegion.global ? "currentColor" : "none"}
+                    fillOpacity={stackViewByRegion.global ? "0.2" : "0"}
+                  />
+                </svg>
+              </Button>
               <Button
                 className="corpusView__addFactButton"
                 onClick={handleAddGlobalFact}
@@ -373,6 +658,17 @@ export const CorpusView: React.FC = () => {
                 <div className="corpusView__emptyState">
                   <p>No builder facts yet</p>
                 </div>
+              ) : stackViewByRegion.builder ? (
+                <div className="corpusView__factGrid">
+                  {builderStacks.map((stack) => (
+                    <FactStack
+                      key={stack.topFact.id}
+                      stack={stack}
+                      onUpdate={handleUpdateFact}
+                      viewContext="corpus"
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className="corpusView__factGrid">
                   {builderFacts.map((fact) => (
@@ -380,12 +676,54 @@ export const CorpusView: React.FC = () => {
                       key={fact.id}
                       fact={fact}
                       onUpdate={handleUpdateFact}
+                      viewContext="corpus"
                     />
                   ))}
                 </div>
               )}
             </div>
             <div className="corpusView__builderFactsRegionActions">
+              <Button
+                className="corpusView__stackViewButton"
+                variant="secondary"
+                onClick={() => handleToggleStackView("builder")}
+                title={
+                  stackViewByRegion.builder
+                    ? "Disable stack view"
+                    : "Enable stack view"
+                }
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Overlapped boxes icon */}
+                  <rect
+                    x="2"
+                    y="6"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                  <rect
+                    x="6"
+                    y="2"
+                    width="8"
+                    height="8"
+                    rx="1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill={stackViewByRegion.builder ? "currentColor" : "none"}
+                    fillOpacity={stackViewByRegion.builder ? "0.2" : "0"}
+                  />
+                </svg>
+              </Button>
               <Button
                 className="corpusView__addFactButton"
                 onClick={handleAddBuilderFact}

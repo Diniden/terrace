@@ -6,7 +6,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project } from '../../entities/project.entity';
-import { ProjectMember, ProjectRole } from '../../entities/project-member.entity';
+import {
+  ProjectMember,
+  ProjectRole,
+} from '../../entities/project-member.entity';
 import { User, ApplicationRole } from '../../entities/user.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -72,7 +75,10 @@ export class ProjectService {
     return project;
   }
 
-  async create(createProjectDto: CreateProjectDto, user: User): Promise<Project> {
+  async create(
+    createProjectDto: CreateProjectDto,
+    user: User,
+  ): Promise<Project> {
     const project = this.projectRepository.create({
       ...createProjectDto,
       ownerId: user.id,
@@ -154,11 +160,7 @@ export class ProjectService {
     return this.projectMemberRepository.save(member);
   }
 
-  async removeMember(
-    id: string,
-    userId: string,
-    user: User,
-  ): Promise<void> {
+  async removeMember(id: string, userId: string, user: User): Promise<void> {
     const project = await this.findOne(id, user);
 
     // Only OWNER or ADMIN can remove members

@@ -5,7 +5,25 @@
   flex-direction: column;
   justify-content: center;
   min-width: 200px;
-  max-width: 300px;
+  max-width: 400px;
+  /* Cards shrink-wrap to content, no width: 100% stretching */
+}
+
+.factCard--highlighted {
+  outline: 3px solid var(--color-clarify);
+  outline-offset: 2px;
+  animation: shrinkOutline 5s ease-out forwards;
+}
+
+@keyframes shrinkOutline {
+  0% {
+    outline-width: 3px;
+    outline-offset: 2px;
+  }
+  100% {
+    outline-width: 0px;
+    outline-offset: 0px;
+  }
 }
 
 .factCard__stateIndicator {
@@ -40,6 +58,7 @@
 
 .factCard__statement {
   flex: 1;
+  white-space: pre-line;
   word-wrap: break-word;
   font-size: var(--font-size-base);
   line-height: 1.4;

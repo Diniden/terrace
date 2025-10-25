@@ -13,6 +13,10 @@ export const factsApi = {
     return apiClient.get<Fact>(`/facts/${id}`);
   },
 
+  async getOneWithRelationships(id: string): Promise<Fact> {
+    return apiClient.get<Fact>(`/facts/${id}/relationships`);
+  },
+
   async create(data: {
     statement?: string;
     corpusId: string;

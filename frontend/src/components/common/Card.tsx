@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import { type ReactNode, forwardRef } from 'react';
 import './Card.css';
 
 interface CardProps {
@@ -8,16 +8,21 @@ interface CardProps {
   onClick?: () => void;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '', width, onClick }) => {
-  const cardClasses = `card ${onClick ? 'card--clickable' : ''} ${className}`.trim();
+export const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ children, className = '', width, onClick }, ref) => {
+    const cardClasses = `card ${onClick ? 'card--clickable' : ''} ${className}`.trim();
 
-  return (
-    <div
-      className={cardClasses}
-      style={{ width }}
-      onClick={onClick}
-    >
-      {children}
-    </div>
-  );
-};
+    return (
+      <div
+        ref={ref}
+        className={cardClasses}
+        style={{ width }}
+        onClick={onClick}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+Card.displayName = 'Card';

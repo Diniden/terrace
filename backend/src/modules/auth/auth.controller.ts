@@ -24,9 +24,7 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(
-    @CurrentUser() user: User,
-  ): Promise<{
+  async getProfile(@CurrentUser() user: User): Promise<{
     id: string;
     email: string;
     applicationRole: ApplicationRole;

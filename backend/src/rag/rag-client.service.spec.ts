@@ -246,11 +246,9 @@ describe('RagClientService', () => {
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
 
-      const result = await service.searchFacts(
-        'test query',
-        10,
-        ['corpus-123'],
-      );
+      const result = await service.searchFacts('test query', 10, [
+        'corpus-123',
+      ]);
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith(
         '/search',

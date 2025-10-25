@@ -46,6 +46,7 @@ export class FactService {
       .leftJoinAndSelect('fact.corpus', 'corpus')
       .leftJoinAndSelect('fact.basis', 'basis')
       .leftJoinAndSelect('fact.supports', 'supports')
+      .leftJoinAndSelect('fact.supportedBy', 'supportedBy')
       .skip(skip)
       .take(limit)
       .orderBy('fact.createdAt', 'DESC');
@@ -105,6 +106,128 @@ export class FactService {
     return fact;
   }
 
+  /**
+   * Find fact with complete relationship context for detailed view
+   * Loads: basis, supports, supportedBy, dependentFacts, corpus, basisChain
+   */
+  async findOneWithRelationships(id: string, user: User): Promise<Fact> {
+    const fact = await this.factRepository.findOne({
+      where: { id },
+      relations: [
+        'corpus',
+        'corpus.project',
+        'basis',
+        'supports',
+        'supportedBy',
+      ],
+    });
+
+    if (!fact) {
+      throw new NotFoundException(`Fact with ID ${id} not found`);
+    }
+
+    // Check access
+    await this.checkProjectAccess(
+      fact.corpus.projectId,
+      user,
+      ProjectRole.VIEWER,
+    );
+
+    // Load dependent facts (facts that have this fact as their basis)
+    const dependentFacts = await this.findDependentFacts(id);
+
+    // Load complete basis chain from root to current fact
+    const basisChain = await this.loadBasisChain(id);
+
+    // Attach virtual properties to the result
+    (fact as any).dependentFacts = dependentFacts;
+    (fact as any).basisChain = basisChain;
+
+    return fact;
+  }
+
+  /**
+   * Load the complete chain of basis facts from root to the specified fact
+   * Returns array ordered from root (first) to immediate parent (last)
+   * Does NOT include the specified fact itself
+   *
+   * Safeguards:
+   * - Maximum depth of 50 levels
+   * - Circular reference detection
+   * - Minimal data loading (id, statement, context, corpusId)
+   */
+  private async loadBasisChain(factId: string): Promise<Partial<Fact>[]> {
+    const MAX_DEPTH = 50;
+    const visited = new Set<string>();
+    const chain: Partial<Fact>[] = [];
+
+    // Start with the immediate basis of the requested fact
+    const startFact = await this.factRepository.findOne({
+      where: { id: factId },
+      select: ['id', 'basisId'],
+    });
+
+    if (!startFact || !startFact.basisId) {
+      // No basis, return empty chain
+      return [];
+    }
+
+    let currentBasisId: string | null = startFact.basisId;
+    let depth = 0;
+
+    // Traverse up the basis chain iteratively
+    while (currentBasisId && depth < MAX_DEPTH) {
+      // Check for circular reference
+      if (visited.has(currentBasisId)) {
+        // Circular reference detected, stop traversal
+        break;
+      }
+
+      visited.add(currentBasisId);
+
+      // Load the basis fact with minimal data
+      const basisFact = await this.factRepository.findOne({
+        where: { id: currentBasisId },
+        select: ['id', 'statement', 'state', 'context', 'corpusId', 'basisId'],
+        relations: ['corpus'],
+      });
+
+      if (!basisFact) {
+        // Basis fact not found, stop traversal
+        break;
+      }
+
+      // Add to chain (will reverse later to get root-first order)
+      chain.push({
+        id: basisFact.id,
+        statement: basisFact.statement,
+        state: basisFact.state,
+        context: basisFact.context,
+        corpusId: basisFact.corpusId,
+        corpus: basisFact.corpus,
+      });
+
+      // Move to next basis
+      currentBasisId = basisFact.basisId;
+      depth++;
+    }
+
+    // Reverse the chain so root is first, immediate parent is last
+    return chain.reverse();
+  }
+
+  /**
+   * Find all facts that have the specified fact as their basis
+   * Returns facts ordered by creation date (newest first)
+   */
+  async findDependentFacts(basisId: string): Promise<Fact[]> {
+    return this.factRepository.find({
+      where: { basisId },
+      relations: ['corpus'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findByContext(
     corpusId: string,
     context: FactContext,
@@ -131,8 +254,15 @@ export class FactService {
   }
 
   async create(createFactDto: CreateFactDto, user: User): Promise<Fact> {
-    const { corpusId, basisId, statement, state, meta, context } =
-      createFactDto;
+    const {
+      corpusId,
+      basisId,
+      statement,
+      state,
+      meta,
+      context,
+      supportedById,
+    } = createFactDto;
 
     // Get corpus and check access
     const corpus = await this.corpusRepository.findOne({
@@ -205,10 +335,48 @@ export class FactService {
 
     const savedFact = await this.factRepository.save(fact);
 
+    // If supportedById is provided, create the support relationship
+    if (supportedById) {
+      const targetFact = await this.factRepository.findOne({
+        where: { id: supportedById },
+        relations: ['corpus', 'supports'],
+      });
+
+      if (!targetFact) {
+        throw new NotFoundException('Target fact to support not found');
+      }
+
+      // Validate target fact is in same corpus
+      if (targetFact.corpusId !== corpusId) {
+        throw new BadRequestException(
+          'Cannot create support relationship: target fact must be in the same corpus',
+        );
+      }
+
+      // Validate both facts have the same context
+      if (targetFact.context !== factContext) {
+        throw new BadRequestException(
+          `Cannot create support relationship between different contexts: ${factContext} and ${targetFact.context}`,
+        );
+      }
+
+      // Add the new fact as supporting the target fact
+      if (!targetFact.supports) {
+        targetFact.supports = [];
+      }
+      targetFact.supports.push(savedFact);
+      await this.factRepository.save(targetFact);
+    }
+
     // Trigger embedding asynchronously (fire-and-forget)
     // Only if fact has a statement
     if (savedFact.statement && savedFact.statement.trim() !== '') {
       this.ragEmbeddingService.processFactEmbedding(savedFact.id);
+    }
+
+    // Reload fact with relationships if supportedById was used
+    if (supportedById) {
+      return this.findOne(savedFact.id, user);
     }
 
     return savedFact;
@@ -330,18 +498,15 @@ export class FactService {
       updateFactDto.statement !== fact.statement;
 
     Object.assign(fact, updateFactDto);
-    const updatedFact = await this.factRepository.save(fact);
+    await this.factRepository.save(fact);
 
     // Trigger embedding asynchronously if statement changed and has content
-    if (
-      statementChanged &&
-      updatedFact.statement &&
-      updatedFact.statement.trim() !== ''
-    ) {
-      this.ragEmbeddingService.processFactEmbedding(updatedFact.id);
+    if (statementChanged && fact.statement && fact.statement.trim() !== '') {
+      this.ragEmbeddingService.processFactEmbedding(fact.id);
     }
 
-    return updatedFact;
+    // Reload the fact with all relations to ensure frontend gets complete data
+    return this.findOne(id, user);
   }
 
   async remove(id: string, user: User): Promise<void> {

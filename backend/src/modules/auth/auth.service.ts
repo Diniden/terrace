@@ -75,10 +75,8 @@ export class AuthService {
   }
 
   async ensureAdminUser(): Promise<void> {
-    const adminEmail =
-      process.env.ADMIN_EMAIL || 'admin@geniant.com';
-    const adminPassword =
-      process.env.ADMIN_PASSWORD || 'Uns3cur3!';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@geniant.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Uns3cur3!';
 
     const existingAdmin = await this.userRepository.findOne({
       where: { email: adminEmail },

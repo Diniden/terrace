@@ -1,0 +1,377 @@
+/* FactView Page Styles */
+
+.factView {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--color-grey-100);
+}
+
+/* Page Body Layout */
+.factView__body {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex: 1;
+  overflow: hidden;
+  padding: var(--spacing-md);
+}
+
+/* Region Headers */
+.factView__regionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+}
+
+.factView__corpusLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-grey-500);
+  font-style: italic;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Basis Fact Column (Far Left) */
+.factView__basisColumn {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 370px;
+  height: 100%;
+  border-right: 1px solid var(--color-grey-200);
+  padding-right: var(--spacing-md);
+}
+
+.factView__basisColumnInner {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+/* Selected Fact Container (Fixed at top, max 50% height) */
+.factView__selectedFactContainer {
+  flex-shrink: 0;
+  max-height: 50%;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  padding-bottom: var(--spacing-lg);
+  background-color: rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--color-grey-200);
+  border-radius: var(--radius-md);
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.factView__selectedFactLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-sm);
+  text-align: center;
+}
+
+/* Horizontal separator line */
+.factView__basisSeparator {
+  height: 1px;
+  background-color: var(--color-grey-300);
+  margin: var(--spacing-md) 0;
+  flex-shrink: 0;
+}
+
+/* Basis Chain Section Wrapper */
+.factView__basisChainSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Basis facts list (scrollable) */
+.factView__basisColumnContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  scroll-behavior: smooth;
+  align-items: center;
+}
+
+.factView__basisColumnContent .factCard {
+  min-height: auto;
+}
+
+/* Basis Fact Container */
+.factView__basisFactContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+}
+
+/* Basis Fact Corpus Label (very faint) */
+.factView__basisFactCorpusLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-grey-600);
+  opacity: 0.5;
+  text-align: center;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  padding: 0 var(--spacing-sm);
+}
+
+/* Set Basis Container */
+.factView__setBasisContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  gap: var(--spacing-md);
+}
+
+.factView__setBasisLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-grey-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--font-weight-medium);
+}
+
+.factView__setBasisButton {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Basis Selection */
+.factView__cancelBasisButton {
+  margin-left: var(--spacing-md);
+  font-size: var(--font-size-xs) !important;
+  padding: var(--spacing-xs) var(--spacing-sm) !important;
+  height: auto !important;
+}
+
+.factView__basisSelectableContainer {
+  width: 100%;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.factView__basisSelectableContainer:hover {
+  transform: scale(1.02);
+}
+
+.factView__basisSelectableFactCard {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-grey-200);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  position: relative;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.factView__basisSelectableContainer:hover .factView__basisSelectableFactCard {
+  border-color: var(--color-grey-400);
+  box-shadow: var(--shadow-md);
+}
+
+.factView__basisSelectableStateIndicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 100%;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.factView__basisSelectableContent {
+  padding-left: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+/* Supporting Facts Region (Middle) */
+.factView__supportingFactsRegion {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  border-right: 1px solid var(--color-grey-200);
+  overflow: hidden;
+  padding: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+}
+
+.factView__supportingFactsRegionInner {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.factView__supportingFactsRegionContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.factView__supportingFactsRegionActions {
+  flex-shrink: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+/* Derived Facts Region (Far Right) */
+.factView__derivedFactsRegion {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: var(--spacing-md);
+  padding-left: var(--spacing-lg);
+}
+
+.factView__derivedFactsRegionInner {
+  display: flex;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+
+.factView__derivedFactsRegionContent {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.factView__derivedFactsRegionActions {
+  flex-shrink: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+.factView__addFactButton {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fact Grid Layout (for supporting/derived facts) */
+.factView__factGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  align-content: flex-start;
+}
+
+/* Empty State */
+.factView__emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl);
+  color: var(--color-grey-500);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  height: 100%;
+  min-height: 150px;
+}
+
+.factView__emptyState p {
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .factView__body {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .factView__basisColumn {
+    max-width: 100%;
+    min-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-grey-200);
+    padding-right: 0;
+    padding-bottom: var(--spacing-md);
+  }
+
+  .factView__supportingFactsRegion,
+  .factView__derivedFactsRegion {
+    min-height: 300px;
+    border-right: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .factView__body {
+    padding: var(--spacing-sm);
+  }
+
+  .factView__factGrid {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+
+  .factView__regionHeader {
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .factView__corpusLabel {
+    font-size: var(--font-size-xs);
+  }
+}

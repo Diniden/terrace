@@ -39,12 +39,20 @@ interface Corpus {
   basisCorpusId: string | null;
 }
 
+// Global fact counter and mapping
+let globalFactCounter = 0;
+const factIdToNumber = new Map<string, number>();
+
 async function seedData() {
   console.log('🌱 Connecting to database...');
 
   try {
     await dataSource.initialize();
     console.log('✅ Connected to database\n');
+
+    // Reset global counter at start
+    globalFactCounter = 0;
+    factIdToNumber.clear();
 
     // Get all users
     const users = await dataSource.query('SELECT id, email FROM users');
@@ -67,6 +75,7 @@ async function seedData() {
     await validateContextConstraints();
 
     console.log('\n\n✨ All data seeded successfully!\n');
+    console.log(`📊 Total facts created: ${globalFactCounter}\n`);
   } catch (error) {
     console.error('❌ Error seeding data:', error);
     process.exit(1);
@@ -192,8 +201,14 @@ async function createCorpusChain(
     );
 
     // Assign basis facts from parent corpus ONLY for KNOWLEDGE facts
+    // ALL KNOWLEDGE facts in child corpuses MUST have a basis
     if (corpus.basisCorpusId) {
-      await assignBasisFacts(knowledgeFactIds, corpus.basisCorpusId, indent + '  ');
+      if (knowledgeFactIds.length > 0) {
+        await assignBasisFacts(knowledgeFactIds, corpus.basisCorpusId, indent + '  ');
+      }
+    } else {
+      // Top-level corpus - no basis needed
+      console.log(`${indent}  ℹ️  Top-level corpus - KNOWLEDGE facts have no basis`);
     }
 
     // Assign sibling facts (2-10 from the same corpus) for KNOWLEDGE facts
@@ -238,7 +253,10 @@ async function createGlobalFacts(
   console.log(`${indent}🌍 Creating ${count} CORPUS_GLOBAL facts (basis_id must be null)...`);
 
   for (let i = 0; i < count; i++) {
-    const statement = globalStatements[i % globalStatements.length];
+    globalFactCounter++;
+    const factNumber = globalFactCounter;
+    const originalStatement = globalStatements[i % globalStatements.length];
+    const statement = `Fact: ${factNumber}\n${originalStatement}`;
 
     const result = await dataSource.query(
       `INSERT INTO facts (corpus_id, statement, context, basis_id, state)
@@ -246,7 +264,9 @@ async function createGlobalFacts(
        RETURNING id`,
       [corpusId, statement, FactContext.CORPUS_GLOBAL, null, 'ready']
     );
-    factIds.push(result[0].id);
+    const factId = result[0].id;
+    factIds.push(factId);
+    factIdToNumber.set(factId, factNumber);
   }
 
   console.log(`${indent}  ✓ Created ${count} GLOBAL facts`);
@@ -271,7 +291,10 @@ async function createBuilderFacts(
   console.log(`${indent}🔧 Creating ${count} CORPUS_BUILDER facts (basis_id must be null)...`);
 
   for (let i = 0; i < count; i++) {
-    const statement = builderStatements[i % builderStatements.length];
+    globalFactCounter++;
+    const factNumber = globalFactCounter;
+    const originalStatement = builderStatements[i % builderStatements.length];
+    const statement = `Fact: ${factNumber}\n${originalStatement}`;
 
     const result = await dataSource.query(
       `INSERT INTO facts (corpus_id, statement, context, basis_id, state)
@@ -279,7 +302,9 @@ async function createBuilderFacts(
        RETURNING id`,
       [corpusId, statement, FactContext.CORPUS_BUILDER, null, 'ready']
     );
-    factIds.push(result[0].id);
+    const factId = result[0].id;
+    factIds.push(factId);
+    factIdToNumber.set(factId, factNumber);
   }
 
   console.log(`${indent}  ✓ Created ${count} BUILDER facts`);
@@ -320,16 +345,21 @@ async function createKnowledgeFacts(
   console.log(`${indent}📖 Creating ${count} CORPUS_KNOWLEDGE facts (can have basis_id)...`);
 
   for (let i = 0; i < count; i++) {
-    const statement = knowledgeStatements[i % knowledgeStatements.length];
+    globalFactCounter++;
+    const factNumber = globalFactCounter;
+    const originalStatement = knowledgeStatements[i % knowledgeStatements.length];
+    const statement = `Fact: ${factNumber}\n${originalStatement}`;
     const state = states[i % states.length];
 
     const result = await dataSource.query(
       `INSERT INTO facts (corpus_id, statement, context, state)
        VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [corpusId, `${statement} (Fact ${i + 1})`, FactContext.CORPUS_KNOWLEDGE, state]
+      [corpusId, statement, FactContext.CORPUS_KNOWLEDGE, state]
     );
-    factIds.push(result[0].id);
+    const factId = result[0].id;
+    factIds.push(factId);
+    factIdToNumber.set(factId, factNumber);
   }
 
   console.log(`${indent}  ✓ Created ${count} KNOWLEDGE facts`);
@@ -348,24 +378,61 @@ async function assignBasisFacts(
   );
 
   if (parentFacts.length === 0) {
-    console.log(`${indent}⚠️  No KNOWLEDGE facts in parent corpus to assign as basis`);
-    return;
+    console.error(`${indent}❌ ERROR: No KNOWLEDGE facts in parent corpus to assign as basis`);
+    throw new Error(
+      `Cannot create child corpus facts: parent corpus has no KNOWLEDGE facts to use as basis`
+    );
   }
 
-  console.log(`${indent}🔗 Assigning basis facts from parent corpus (KNOWLEDGE facts only)...`);
+  console.log(`${indent}🔗 Assigning basis facts from parent corpus (${parentFacts.length} available)...`);
 
-  // Assign a random basis fact from parent corpus KNOWLEDGE facts to each fact
+  let assignedCount = 0;
+
+  // Assign a random basis fact from parent corpus KNOWLEDGE facts to EACH fact
   for (const factId of factIds) {
     const randomBasisFact =
       parentFacts[Math.floor(Math.random() * parentFacts.length)];
 
-    await dataSource.query(
-      `UPDATE facts SET basis_id = $1 WHERE id = $2`,
-      [randomBasisFact.id, factId]
+    const basisFactNumber = factIdToNumber.get(randomBasisFact.id);
+
+    if (basisFactNumber === undefined) {
+      console.error(`${indent}❌ ERROR: Basis fact ${randomBasisFact.id} not found in fact number mapping`);
+      throw new Error(`Cannot find fact number for basis fact`);
+    }
+
+    // Get current statement and prepend basis information
+    const currentFact = await dataSource.query(
+      `SELECT statement FROM facts WHERE id = $1`,
+      [factId]
     );
+
+    const currentStatement = currentFact[0].statement;
+    // Insert "Basis: X\n" after the "Fact: X\n" line
+    const factLineEnd = currentStatement.indexOf('\n');
+    const updatedStatement =
+      currentStatement.substring(0, factLineEnd + 1) +
+      `Basis: ${basisFactNumber}\n` +
+      currentStatement.substring(factLineEnd + 1);
+
+    await dataSource.query(
+      `UPDATE facts SET basis_id = $1, statement = $2 WHERE id = $3`,
+      [randomBasisFact.id, updatedStatement, factId]
+    );
+    assignedCount++;
   }
 
-  console.log(`${indent}  ✓ Assigned ${factIds.length} basis relationships`);
+  console.log(`${indent}  ✓ Assigned basis to ALL ${assignedCount}/${factIds.length} KNOWLEDGE facts`);
+
+  // Verify all facts have basis assigned
+  const factsWithoutBasis = await dataSource.query(
+    `SELECT id FROM facts WHERE id = ANY($1) AND basis_id IS NULL`,
+    [factIds]
+  );
+
+  if (factsWithoutBasis.length > 0) {
+    console.error(`${indent}❌ ERROR: ${factsWithoutBasis.length} facts still missing basis!`);
+    throw new Error(`Failed to assign basis to all facts in child corpus`);
+  }
 }
 
 async function assignSiblingFacts(factIds: string[]): Promise<void> {
@@ -441,6 +508,25 @@ async function validateContextConstraints(): Promise<void> {
       console.error(`    - ${fact.id}: basis has context ${fact.basis_context}`);
     });
     throw new Error('Context constraint violation: KNOWLEDGE facts must reference KNOWLEDGE basis');
+  }
+
+  // Check that ALL KNOWLEDGE facts in child corpuses have a basis
+  const knowledgeFactsWithoutBasisInChildCorpuses = await dataSource.query(
+    `SELECT f.id, f.statement, c.name as corpus_name
+     FROM facts f
+     JOIN corpuses c ON f.corpus_id = c.id
+     WHERE f.context = $1
+       AND f.basis_id IS NULL
+       AND c.basis_corpus_id IS NOT NULL`,
+    [FactContext.CORPUS_KNOWLEDGE]
+  );
+
+  if (knowledgeFactsWithoutBasisInChildCorpuses.length > 0) {
+    console.error('  ❌ ERROR: Found CORPUS_KNOWLEDGE facts in child corpuses without basis:');
+    knowledgeFactsWithoutBasisInChildCorpuses.forEach((fact: any) => {
+      console.error(`    - ${fact.id} in "${fact.corpus_name}": ${fact.statement.substring(0, 60)}...`);
+    });
+    throw new Error('Constraint violation: KNOWLEDGE facts in child corpuses must have basis from parent corpus');
   }
 
   // Show statistics

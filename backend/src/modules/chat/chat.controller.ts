@@ -33,7 +33,7 @@ export class ChatController {
   @ApiOperation({
     summary: 'Get user chat history',
     description:
-      'Retrieves the authenticated user\'s chat message history in reverse chronological order (newest first)',
+      "Retrieves the authenticated user's chat message history in reverse chronological order (newest first)",
   })
   @ApiQuery({
     name: 'limit',
