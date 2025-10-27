@@ -4,6 +4,7 @@ import { projectsApi } from "../api/projects";
 import { corpusesApi } from "../api/corpuses";
 import { factsApi } from "../api/facts";
 import { useAuth } from "../context/AuthContext";
+import { useProjectViewSettings } from "../hooks/useProjectViewSettings";
 import { Button } from "../components/common/Button";
 import { Spinner } from "../components/common/Spinner";
 import { Modal } from "../components/common/Modal";
@@ -16,6 +17,7 @@ import { FactStack } from "../components/user/FactStack";
 import { computeFactStacks } from "../utils/factStackUtils";
 import type { Project, Corpus, Fact, FactState, FactContext } from "../types";
 import { FactContext as FactContextEnum } from "../types";
+import type { FactStack as FactStackType } from "../utils/factStackUtils";
 import "./ProjectDetailPage.css";
 
 export const ProjectDetailPage: React.FC = () => {
@@ -40,18 +42,75 @@ export const ProjectDetailPage: React.FC = () => {
   const [stackViewByCorpus, setStackViewByCorpus] = useState<
     Record<string, boolean>
   >({});
+  const [expandedStacksByCorpus, setExpandedStacksByCorpus] = useState<
+    Record<string, Set<string>>
+  >({});
 
   const llmInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const corpusColumnRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const factCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const corpusColumnsContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const settingsRestoredRef = useRef(false);
+  const scrollXRestoredRef = useRef(false);
+
+  // Project view settings hook
+  const {
+    settings: viewSettings,
+    loading: settingsLoading,
+    updateCorpusSettings,
+    getCorpusSettings,
+    updateScrollX,
+    saveNow,
+  } = useProjectViewSettings(projectId);
 
   useEffect(() => {
     if (projectId) {
       loadProjectData();
     }
   }, [projectId]);
+
+  // Restore settings when both data and settings are loaded
+  useEffect(() => {
+    if (
+      !loading &&
+      !settingsLoading &&
+      corpuses.length > 0 &&
+      !settingsRestoredRef.current &&
+      viewSettings
+    ) {
+      restoreSettings();
+      settingsRestoredRef.current = true;
+    }
+  }, [loading, settingsLoading, corpuses, viewSettings]);
+
+  // Track horizontal scroll position
+  useEffect(() => {
+    // Use the direct ref to the corpus columns container (the scroll container)
+    const scrollContainer = corpusColumnsContainerRef.current;
+
+    if (!scrollContainer) {
+      return;
+    }
+
+    // Store in scrollContainerRef for use in other functions
+    scrollContainerRef.current = scrollContainer;
+
+    const handleScroll = () => {
+      // CRITICAL: Read scrollLeft directly from the current scroll container
+      // This ensures we always get the LIVE scroll position
+      const currentScrollX = scrollContainer.scrollLeft;
+      updateScrollX(currentScrollX);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [updateScrollX, loading, corpuses.length]);
 
   useEffect(() => {
     // Initialize speech recognition
@@ -124,18 +183,122 @@ export const ProjectDetailPage: React.FC = () => {
       }
     };
 
+    // Save settings before page unload
+    const handleBeforeUnload = () => {
+      saveCurrentScrollPositions();
+      saveNow();
+    };
+
     window.addEventListener("keydown", handleKeyPress);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+
+      // Save settings when component unmounts (navigation away)
+      saveCurrentScrollPositions();
+      saveNow();
     };
-  }, []);
+  }, [saveNow]);
+
+  // Helper to save current scroll positions for all corpus columns
+  const saveCurrentScrollPositions = useCallback(() => {
+    corpuses.forEach((corpus) => {
+      const corpusColumnElement = corpusColumnRefs.current[corpus.id];
+      if (corpusColumnElement) {
+        const factsListElement = corpusColumnElement.querySelector(
+          ".projectDetailPage__factsList"
+        );
+        if (factsListElement) {
+          const scrollPosition = factsListElement.scrollTop;
+          updateCorpusSettings(corpus.id, { scrollPosition });
+        }
+      }
+    });
+
+    // Also save horizontal scroll position
+    if (scrollContainerRef.current) {
+      const scrollX = scrollContainerRef.current.scrollLeft;
+      updateScrollX(scrollX);
+    }
+  }, [corpuses, updateCorpusSettings, updateScrollX]);
+
+  // Helper to restore settings after data is loaded
+  const restoreSettings = useCallback(() => {
+    if (!viewSettings) return;
+
+    corpuses.forEach((corpus) => {
+      const corpusSettings = getCorpusSettings(corpus.id);
+      if (!corpusSettings) return;
+
+      // Restore column width
+      if (corpusSettings.columnWidth) {
+        setColumnCountByCorpus((prev) => ({
+          ...prev,
+          [corpus.id]: corpusSettings.columnWidth,
+        }));
+      }
+
+      // Restore stack view
+      if (corpusSettings.stackView !== undefined) {
+        setStackViewByCorpus((prev) => ({
+          ...prev,
+          [corpus.id]: corpusSettings.stackView,
+        }));
+      }
+
+      // Restore expanded stacks
+      if (corpusSettings.expandedStacks && corpusSettings.expandedStacks.length > 0) {
+        setExpandedStacksByCorpus((prev) => ({
+          ...prev,
+          [corpus.id]: new Set(corpusSettings.expandedStacks),
+        }));
+      }
+
+      // Restore corpus vertical scroll position after width animation completes (300ms)
+      setTimeout(() => {
+        const corpusColumnElement = corpusColumnRefs.current[corpus.id];
+        if (corpusColumnElement) {
+          const factsListElement = corpusColumnElement.querySelector(
+            ".projectDetailPage__factsList"
+          );
+          if (factsListElement && corpusSettings.scrollPosition) {
+            factsListElement.scrollTo({
+              top: corpusSettings.scrollPosition,
+              behavior: "auto",
+            });
+          }
+        }
+      }, 300);
+    });
+
+    // Restore horizontal scrollX position after all width animations and content layout complete (800ms)
+    // This delay ensures:
+    // - All FactStacks have rendered
+    // - Column width animations have completed (300ms)
+    // - FactStack expand/collapse animations have completed
+    // - Scroll container has its final scrollWidth
+    if (viewSettings.settings.scrollX && !scrollXRestoredRef.current) {
+      setTimeout(() => {
+        // Get the scroll container from ref or directly from DOM
+        const scrollContainer = scrollContainerRef.current || corpusColumnsContainerRef.current;
+        if (scrollContainer) {
+          scrollContainer.scrollTo({
+            left: viewSettings.settings.scrollX,
+            behavior: "auto",
+          });
+          scrollXRestoredRef.current = true;
+        }
+      }, 800);
+    }
+  }, [viewSettings, corpuses, getCorpusSettings]);
 
   const loadProjectData = async () => {
     if (!projectId) return;
@@ -513,6 +676,10 @@ export const ProjectDetailPage: React.FC = () => {
 
       // Loop: if at max, go to 1; otherwise increment
       const nextCount = currentCount >= maxColumns ? 1 : currentCount + 1;
+
+      // Persist column width setting
+      updateCorpusSettings(corpusId, { columnWidth: nextCount });
+
       return { ...prev, [corpusId]: nextCount };
     });
   };
@@ -529,6 +696,10 @@ export const ProjectDetailPage: React.FC = () => {
 
       // Loop: if at 1, go to max; otherwise decrement
       const nextCount = currentCount <= 1 ? maxColumns : currentCount - 1;
+
+      // Persist column width setting
+      updateCorpusSettings(corpusId, { columnWidth: nextCount });
+
       return { ...prev, [corpusId]: nextCount };
     });
   };
@@ -540,8 +711,47 @@ export const ProjectDetailPage: React.FC = () => {
 
   // Helper function to toggle stack view for a specific corpus
   const handleToggleStackView = (corpusId: string) => {
-    setStackViewByCorpus((prev) => ({ ...prev, [corpusId]: !prev[corpusId] }));
+    setStackViewByCorpus((prev) => {
+      const newValue = !prev[corpusId];
+
+      // Persist stack view setting
+      updateCorpusSettings(corpusId, { stackView: newValue });
+
+      return { ...prev, [corpusId]: newValue };
+    });
   };
+
+  // Helper to handle stack expansion
+  const handleStackExpand = useCallback((corpusId: string, stack: FactStackType) => {
+    setExpandedStacksByCorpus((prev) => {
+      const corpusExpandedStacks = prev[corpusId] || new Set<string>();
+      const newExpandedStacks = new Set(corpusExpandedStacks);
+      newExpandedStacks.add(stack.topFact.id);
+
+      // Persist expanded stacks
+      updateCorpusSettings(corpusId, {
+        expandedStacks: Array.from(newExpandedStacks)
+      });
+
+      return { ...prev, [corpusId]: newExpandedStacks };
+    });
+  }, [updateCorpusSettings]);
+
+  // Helper to handle stack collapse
+  const handleStackCollapse = useCallback((corpusId: string, stack: FactStackType) => {
+    setExpandedStacksByCorpus((prev) => {
+      const corpusExpandedStacks = prev[corpusId] || new Set<string>();
+      const newExpandedStacks = new Set(corpusExpandedStacks);
+      newExpandedStacks.delete(stack.topFact.id);
+
+      // Persist expanded stacks
+      updateCorpusSettings(corpusId, {
+        expandedStacks: Array.from(newExpandedStacks)
+      });
+
+      return { ...prev, [corpusId]: newExpandedStacks };
+    });
+  }, [updateCorpusSettings]);
 
   if (loading) {
     return (
@@ -584,7 +794,10 @@ export const ProjectDetailPage: React.FC = () => {
             <p>Create a corpus to begin adding facts</p>
           </div>
         ) : (
-          <div className="projectDetailPage__corpusColumns">
+          <div
+            className="projectDetailPage__corpusColumns"
+            ref={corpusColumnsContainerRef}
+          >
             {orderCorpusesLeftToRight(corpuses).map((corpus) => (
               <div
                 key={corpus.id}
@@ -610,22 +823,28 @@ export const ProjectDetailPage: React.FC = () => {
                             (fact) =>
                               fact.context === FactContextEnum.CORPUS_KNOWLEDGE
                           )
-                        ).map((stack) => (
-                          <FactStack
-                            key={stack.topFact.id}
-                            ref={(el) => {
-                              factCardRefs.current[stack.topFact.id] = el;
-                            }}
-                            stack={stack}
-                            onUpdate={handleUpdateFact}
-                            viewContext="project"
-                            onNavigateToBasis={handleNavigateToBasis}
-                            onNavigateToDependents={handleNavigateToDependents}
-                            dependentsCount={getDependentsCount(
-                              stack.topFact.id
-                            )}
-                          />
-                        ))}
+                        ).map((stack) => {
+                          const isExpanded = expandedStacksByCorpus[corpus.id]?.has(stack.topFact.id) || false;
+                          return (
+                            <FactStack
+                              key={stack.topFact.id}
+                              ref={(el) => {
+                                factCardRefs.current[stack.topFact.id] = el;
+                              }}
+                              stack={stack}
+                              onUpdate={handleUpdateFact}
+                              viewContext="project"
+                              onNavigateToBasis={handleNavigateToBasis}
+                              onNavigateToDependents={handleNavigateToDependents}
+                              dependentsCount={getDependentsCount(
+                                stack.topFact.id
+                              )}
+                              onExpand={(s) => handleStackExpand(corpus.id, s)}
+                              onCollapse={(s) => handleStackCollapse(corpus.id, s)}
+                              initialExpanded={isExpanded}
+                            />
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="projectDetailPage__factsList">

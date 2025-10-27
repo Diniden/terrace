@@ -5,6 +5,7 @@ import { ProjectMember } from '../entities/project-member.entity';
 import { Corpus } from '../entities/corpus.entity';
 import { Fact } from '../entities/fact.entity';
 import { ChatMessage } from '../entities/chat-message.entity';
+import { ProjectViewSettings } from '../entities/project-view-settings.entity';
 
 export const typeOrmConfig: TypeOrmModuleOptions = {
   type: 'postgres',
@@ -13,7 +14,15 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   username: process.env.DATABASE_USER || 'terrace',
   password: process.env.DATABASE_PASSWORD || 'terrace_dev_password',
   database: process.env.DATABASE_NAME || 'terrace',
-  entities: [User, Project, ProjectMember, Corpus, Fact, ChatMessage],
+  entities: [
+    User,
+    Project,
+    ProjectMember,
+    Corpus,
+    Fact,
+    ChatMessage,
+    ProjectViewSettings,
+  ],
   synchronize: process.env.NODE_ENV === 'development',
   // logging: process.env.NODE_ENV === 'development',
   logging: false,

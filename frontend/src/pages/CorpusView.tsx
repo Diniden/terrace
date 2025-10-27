@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { corpusesApi } from "../api/corpuses";
 import { factsApi } from "../api/facts";
 import { useAuth } from "../context/AuthContext";
+import { useProjectViewSettings } from "../hooks/useProjectViewSettings";
 import { Button } from "../components/common/Button";
 import { Spinner } from "../components/common/Spinner";
 import { PageHeader } from "../components/common/PageHeader";
@@ -11,6 +12,7 @@ import { FactCard } from "../components/user/FactCard";
 import { FactStack } from "../components/user/FactStack";
 import { computeFactStacks } from "../utils/factStackUtils";
 import type { Corpus, Fact, FactState } from "../types";
+import type { FactStack as FactStackType } from "../utils/factStackUtils";
 import {
   FactContext as FactContextEnum,
   FactState as FactStateEnum,
@@ -37,17 +39,46 @@ export const CorpusView: React.FC = () => {
     global: false,
     builder: false,
   });
+  const [expandedStacksByCorpus, setExpandedStacksByCorpus] = useState<Set<string>>(new Set());
 
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const llmInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
+  const settingsRestoredRef = useRef(false);
+
+  // Get projectId from corpus when loaded
+  const projectId = corpus?.projectId;
+
+  // Project view settings hook
+  const {
+    settings: viewSettings,
+    loading: settingsLoading,
+    updateCorpusSettings,
+    getCorpusSettings,
+    saveNow,
+  } = useProjectViewSettings(projectId);
 
   useEffect(() => {
     if (corpusId) {
       loadCorpusData();
     }
   }, [corpusId]);
+
+  // Restore settings when both data and settings are loaded
+  useEffect(() => {
+    if (
+      !loading &&
+      !settingsLoading &&
+      corpus &&
+      corpusId &&
+      !settingsRestoredRef.current &&
+      viewSettings
+    ) {
+      restoreSettings();
+      settingsRestoredRef.current = true;
+    }
+  }, [loading, settingsLoading, corpus, corpusId, viewSettings]);
 
   useEffect(() => {
     // Initialize speech recognition
@@ -101,15 +132,28 @@ export const CorpusView: React.FC = () => {
       recognitionRef.current = recognition;
     }
 
+    // Save settings before page unload
+    const handleBeforeUnload = () => {
+      saveCurrentScrollPositions();
+      saveNow();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+
+      // Save settings when component unmounts (navigation away)
+      saveCurrentScrollPositions();
+      saveNow();
     };
-  }, []);
+  }, [saveNow]);
 
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
@@ -117,6 +161,59 @@ export const CorpusView: React.FC = () => {
       nameInputRef.current.select();
     }
   }, [isEditingName]);
+
+  // Helper to save current scroll positions
+  const saveCurrentScrollPositions = useCallback(() => {
+    if (!corpusId) return;
+
+    const knowledgeColumnElement = document.querySelector(
+      ".corpusView__knowledgeColumnContent .corpusView__factsList"
+    );
+    if (knowledgeColumnElement) {
+      const scrollPosition = knowledgeColumnElement.scrollTop;
+      updateCorpusSettings(corpusId, { scrollPosition });
+    }
+  }, [corpusId, updateCorpusSettings]);
+
+  // Helper to restore settings after data is loaded
+  const restoreSettings = useCallback(() => {
+    if (!viewSettings || !corpusId) return;
+
+    const corpusSettings = getCorpusSettings(corpusId);
+    if (!corpusSettings) return;
+
+    // Restore column width
+    if (corpusSettings.columnWidth) {
+      setKnowledgeColumnCount(corpusSettings.columnWidth);
+    }
+
+    // Restore stack views
+    if (corpusSettings.stackView !== undefined) {
+      setStackViewByRegion({
+        knowledge: corpusSettings.stackView,
+        global: false,
+        builder: false,
+      });
+    }
+
+    // Restore expanded stacks
+    if (corpusSettings.expandedStacks && corpusSettings.expandedStacks.length > 0) {
+      setExpandedStacksByCorpus(new Set(corpusSettings.expandedStacks));
+    }
+
+    // Restore scroll position after DOM is ready
+    setTimeout(() => {
+      const knowledgeColumnElement = document.querySelector(
+        ".corpusView__knowledgeColumnContent .corpusView__factsList"
+      );
+      if (knowledgeColumnElement && corpusSettings.scrollPosition) {
+        knowledgeColumnElement.scrollTo({
+          top: corpusSettings.scrollPosition,
+          behavior: "auto",
+        });
+      }
+    }, 100);
+  }, [viewSettings, corpusId, getCorpusSettings]);
 
   const loadCorpusData = async () => {
     if (!corpusId) return;
@@ -264,28 +361,85 @@ export const CorpusView: React.FC = () => {
   };
 
   const handleExpandKnowledgeColumns = () => {
+    if (!corpusId) return;
+
     const maxColumns = Math.min(5, knowledgeFacts.length);
 
     // Loop: if at max, go to 1; otherwise increment
     const nextCount =
       knowledgeColumnCount >= maxColumns ? 1 : knowledgeColumnCount + 1;
+
+    // Persist column width setting
+    updateCorpusSettings(corpusId, { columnWidth: nextCount });
+
     setKnowledgeColumnCount(nextCount);
   };
 
   const handleShrinkKnowledgeColumns = () => {
+    if (!corpusId) return;
+
     const maxColumns = Math.min(5, knowledgeFacts.length);
 
     // Loop: if at 1, go to max; otherwise decrement
     const nextCount =
       knowledgeColumnCount <= 1 ? maxColumns : knowledgeColumnCount - 1;
+
+    // Persist column width setting
+    updateCorpusSettings(corpusId, { columnWidth: nextCount });
+
     setKnowledgeColumnCount(nextCount);
   };
 
   const handleToggleStackView = (
     region: "knowledge" | "global" | "builder"
   ) => {
-    setStackViewByRegion((prev) => ({ ...prev, [region]: !prev[region] }));
+    if (!corpusId) return;
+
+    setStackViewByRegion((prev) => {
+      const newValue = !prev[region];
+
+      // Only persist for knowledge region (main corpus column)
+      if (region === "knowledge") {
+        updateCorpusSettings(corpusId, { stackView: newValue });
+      }
+
+      return { ...prev, [region]: newValue };
+    });
   };
+
+  // Helper to handle stack expansion
+  const handleStackExpand = useCallback((stack: FactStackType) => {
+    if (!corpusId) return;
+
+    setExpandedStacksByCorpus((prev) => {
+      const newExpandedStacks = new Set(prev);
+      newExpandedStacks.add(stack.topFact.id);
+
+      // Persist expanded stacks
+      updateCorpusSettings(corpusId, {
+        expandedStacks: Array.from(newExpandedStacks)
+      });
+
+      return newExpandedStacks;
+    });
+  }, [corpusId, updateCorpusSettings]);
+
+  // Helper to handle stack collapse
+  const handleStackCollapse = useCallback((stack: FactStackType) => {
+    if (!corpusId) return;
+
+    setExpandedStacksByCorpus((prev) => {
+      const newExpandedStacks = new Set(prev);
+      newExpandedStacks.delete(stack.topFact.id);
+
+      // Persist expanded stacks
+      updateCorpusSettings(corpusId, {
+        expandedStacks: Array.from(newExpandedStacks)
+      });
+
+      return newExpandedStacks;
+    });
+  }, [corpusId, updateCorpusSettings]);
 
   const knowledgeFacts = facts.filter(
     (f) => f.context === FactContextEnum.CORPUS_KNOWLEDGE
@@ -409,14 +563,20 @@ export const CorpusView: React.FC = () => {
                 </div>
               ) : stackViewByRegion.knowledge ? (
                 <div className="corpusView__factsList">
-                  {knowledgeStacks.map((stack) => (
-                    <FactStack
-                      key={stack.topFact.id}
-                      stack={stack}
-                      onUpdate={handleUpdateFact}
-                      viewContext="corpus"
-                    />
-                  ))}
+                  {knowledgeStacks.map((stack) => {
+                    const isExpanded = expandedStacksByCorpus.has(stack.topFact.id);
+                    return (
+                      <FactStack
+                        key={stack.topFact.id}
+                        stack={stack}
+                        onUpdate={handleUpdateFact}
+                        viewContext="corpus"
+                        onExpand={handleStackExpand}
+                        onCollapse={handleStackCollapse}
+                        initialExpanded={isExpanded}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="corpusView__factsList">
@@ -576,14 +736,20 @@ export const CorpusView: React.FC = () => {
                 </div>
               ) : stackViewByRegion.global ? (
                 <div className="corpusView__factGrid">
-                  {globalStacks.map((stack) => (
-                    <FactStack
-                      key={stack.topFact.id}
-                      stack={stack}
-                      onUpdate={handleUpdateFact}
-                      viewContext="corpus"
-                    />
-                  ))}
+                  {globalStacks.map((stack) => {
+                    const isExpanded = expandedStacksByCorpus.has(stack.topFact.id);
+                    return (
+                      <FactStack
+                        key={stack.topFact.id}
+                        stack={stack}
+                        onUpdate={handleUpdateFact}
+                        viewContext="corpus"
+                        onExpand={handleStackExpand}
+                        onCollapse={handleStackCollapse}
+                        initialExpanded={isExpanded}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="corpusView__factGrid">
@@ -661,14 +827,20 @@ export const CorpusView: React.FC = () => {
                 </div>
               ) : stackViewByRegion.builder ? (
                 <div className="corpusView__factGrid">
-                  {builderStacks.map((stack) => (
-                    <FactStack
-                      key={stack.topFact.id}
-                      stack={stack}
-                      onUpdate={handleUpdateFact}
-                      viewContext="corpus"
-                    />
-                  ))}
+                  {builderStacks.map((stack) => {
+                    const isExpanded = expandedStacksByCorpus.has(stack.topFact.id);
+                    return (
+                      <FactStack
+                        key={stack.topFact.id}
+                        stack={stack}
+                        onUpdate={handleUpdateFact}
+                        viewContext="corpus"
+                        onExpand={handleStackExpand}
+                        onCollapse={handleStackCollapse}
+                        initialExpanded={isExpanded}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="corpusView__factGrid">

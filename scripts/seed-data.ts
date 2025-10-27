@@ -1,24 +1,24 @@
 #!/usr/bin/env bun
-import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
-import { resolve } from 'path';
+import { DataSource } from "typeorm";
+import { config } from "dotenv";
+import { resolve } from "path";
 
 // Load environment variables from backend
-config({ path: resolve(__dirname, '../backend/.env') });
+config({ path: resolve(__dirname, "../backend/.env") });
 
 const dataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DATABASE_HOST || 'localhost',
-  port: parseInt(process.env.DATABASE_PORT || '5432'),
-  username: process.env.DATABASE_USER || 'terrace',
-  password: process.env.DATABASE_PASSWORD || 'terrace_dev_password',
-  database: process.env.DATABASE_NAME || 'terrace',
+  type: "postgres",
+  host: process.env.DATABASE_HOST || "localhost",
+  port: parseInt(process.env.DATABASE_PORT || "5432"),
+  username: process.env.DATABASE_USER || "terrace",
+  password: process.env.DATABASE_PASSWORD || "terrace_dev_password",
+  database: process.env.DATABASE_NAME || "terrace",
 });
 
 enum FactContext {
-  CORPUS_GLOBAL = 'corpus_global',
-  CORPUS_BUILDER = 'corpus_builder',
-  CORPUS_KNOWLEDGE = 'corpus_knowledge',
+  CORPUS_GLOBAL = "corpus_global",
+  CORPUS_BUILDER = "corpus_builder",
+  CORPUS_KNOWLEDGE = "corpus_knowledge",
 }
 
 interface User {
@@ -44,21 +44,21 @@ let globalFactCounter = 0;
 const factIdToNumber = new Map<string, number>();
 
 async function seedData() {
-  console.log('🌱 Connecting to database...');
+  console.log("🌱 Connecting to database...");
 
   try {
     await dataSource.initialize();
-    console.log('✅ Connected to database\n');
+    console.log("✅ Connected to database\n");
 
     // Reset global counter at start
     globalFactCounter = 0;
     factIdToNumber.clear();
 
     // Get all users
-    const users = await dataSource.query('SELECT id, email FROM users');
+    const users = await dataSource.query("SELECT id, email FROM users");
 
     if (users.length === 0) {
-      console.log('⚠️  No users found in database. Please create users first.');
+      console.log("⚠️  No users found in database. Please create users first.");
       process.exit(0);
     }
 
@@ -66,68 +66,76 @@ async function seedData() {
 
     for (const user of users) {
       console.log(`\n📦 Seeding data for user: ${user.email}`);
-      await seedUserProjects(user);
+      const projects = await seedUserProjects(user);
       await seedUserChatMessages(user);
+      await seedUserProjectViewSettings(user, projects);
     }
 
     // Validate context constraints
-    console.log('\n🔍 Validating context constraints...');
+    console.log("\n🔍 Validating context constraints...");
     await validateContextConstraints();
 
-    console.log('\n\n✨ All data seeded successfully!\n');
+    console.log("\n\n✨ All data seeded successfully!\n");
     console.log(`📊 Total facts created: ${globalFactCounter}\n`);
   } catch (error) {
-    console.error('❌ Error seeding data:', error);
+    console.error("❌ Error seeding data:", error);
     process.exit(1);
   } finally {
     await dataSource.destroy();
   }
 }
 
-async function seedUserProjects(user: User) {
+async function seedUserProjects(user: User): Promise<Project[]> {
+  const projects: Project[] = [];
+
   // Project 1: Small (3 corpus, 2 facts each)
-  console.log('  📁 Creating small project...');
+  console.log("  📁 Creating small project...");
   const smallProject = await createProject(
     user.id,
-    `${user.email.split('@')[0]}'s Small Project`,
-    'A compact research project focused on exploring initial concepts and ideas with a small dataset.'
+    `${user.email.split("@")[0]}'s Small Project`,
+    "A compact research project focused on exploring initial concepts and ideas with a small dataset."
   );
-  await createCorpusChain(smallProject.id, 3, 2, '    ');
+  projects.push(smallProject);
+  await createCorpusChain(smallProject.id, 3, 2, "    ");
 
   // Project 2: Medium (8 corpus, 5 facts each)
-  console.log('  📁 Creating medium project...');
+  console.log("  📁 Creating medium project...");
   const mediumProject = await createProject(
     user.id,
-    `${user.email.split('@')[0]}'s Medium Project`,
-    'A moderate-sized investigation with multiple corpus entries to track evolving insights and relationships between facts.'
+    `${user.email.split("@")[0]}'s Medium Project`,
+    "A moderate-sized investigation with multiple corpus entries to track evolving insights and relationships between facts."
   );
-  await createCorpusChain(mediumProject.id, 8, 5, '    ');
+  projects.push(mediumProject);
+  await createCorpusChain(mediumProject.id, 8, 5, "    ");
 
   // Project 3: Large (20 corpus, 15 facts each)
-  console.log('  📁 Creating large project...');
+  console.log("  📁 Creating large project...");
   const largeProject = await createProject(
     user.id,
-    `${user.email.split('@')[0]}'s Large Project`,
-    'An extensive research initiative with comprehensive corpus chains for tracking complex fact evolution and detailed knowledge graphs.'
+    `${user.email.split("@")[0]}'s Large Project`,
+    "An extensive research initiative with comprehensive corpus chains for tracking complex fact evolution and detailed knowledge graphs."
   );
-  await createCorpusChain(largeProject.id, 20, 15, '    ');
+  projects.push(largeProject);
+  await createCorpusChain(largeProject.id, 20, 15, "    ");
+
+  return projects;
 }
 
 async function seedUserChatMessages(user: User) {
   const chatMessages = [
-    'How do I create a new project?',
-    'What is the difference between a corpus and a project?',
-    'Can you explain how fact relationships work?',
-    'Show me all the facts in my current corpus',
-    'How do I add supporting facts to a statement?',
-    'What are the different fact states and what do they mean?',
-    'Can you help me understand the basis concept?',
-    'How do corpus chains work in this system?',
-    'What is the purpose of fact contexts?',
-    'Explain the difference between GLOBAL and KNOWLEDGE contexts',
+    "How do I create a new project?",
+    "What is the difference between a corpus and a project?",
+    "Can you explain how fact relationships work?",
+    "Show me all the facts in my current corpus",
+    "How do I add supporting facts to a statement?",
+    "What are the different fact states and what do they mean?",
+    "Can you help me understand the basis concept?",
+    "How do corpus chains work in this system?",
+    "What is the purpose of fact contexts?",
+    "Explain the difference between GLOBAL and KNOWLEDGE contexts",
   ];
 
-  console.log('  💬 Creating sample chat messages...');
+  console.log("  💬 Creating sample chat messages...");
 
   // Create 5-10 random chat messages with timestamps spread over the last 7 days
   const messageCount = Math.floor(Math.random() * 6) + 5; // 5-10 messages
@@ -168,7 +176,7 @@ async function createProject(
   // Also add owner as member
   await dataSource.query(
     `INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3)`,
-    [result[0].id, ownerId, 'owner']
+    [result[0].id, ownerId, "owner"]
   );
 
   return result[0];
@@ -192,30 +200,39 @@ async function createCorpusChain(
     console.log(`${indent}📚 Creating "${corpus.name}"...`);
 
     // Create context-specific facts
-    const globalFactIds = await createGlobalFacts(corpus.id, indent + '  ');
-    const builderFactIds = await createBuilderFacts(corpus.id, indent + '  ');
+    const globalFactIds = await createGlobalFacts(corpus.id, indent + "  ");
+    const builderFactIds = await createBuilderFacts(corpus.id, indent + "  ");
     const knowledgeFactIds = await createKnowledgeFacts(
       corpus.id,
       factsPerCorpus,
-      indent + '  '
+      indent + "  "
     );
 
     // Assign basis facts from parent corpus ONLY for KNOWLEDGE facts
     // ALL KNOWLEDGE facts in child corpuses MUST have a basis
     if (corpus.basisCorpusId) {
       if (knowledgeFactIds.length > 0) {
-        await assignBasisFacts(knowledgeFactIds, corpus.basisCorpusId, indent + '  ');
+        await assignBasisFacts(
+          knowledgeFactIds,
+          corpus.basisCorpusId,
+          indent + "  "
+        );
       }
     } else {
       // Top-level corpus - no basis needed
-      console.log(`${indent}  ℹ️  Top-level corpus - KNOWLEDGE facts have no basis`);
+      console.log(
+        `${indent}  ℹ️  Top-level corpus - KNOWLEDGE facts have no basis`
+      );
     }
 
     // Assign sibling facts (2-10 from the same corpus) for KNOWLEDGE facts
     await assignSiblingFacts(knowledgeFactIds);
 
-    const totalFacts = globalFactIds.length + builderFactIds.length + knowledgeFactIds.length;
-    console.log(`${indent}✅ Created "${corpus.name}" with ${totalFacts} total facts\n`);
+    const totalFacts =
+      globalFactIds.length + builderFactIds.length + knowledgeFactIds.length;
+    console.log(
+      `${indent}✅ Created "${corpus.name}" with ${totalFacts} total facts\n`
+    );
 
     previousCorpusId = corpus.id;
   }
@@ -241,16 +258,18 @@ async function createGlobalFacts(
   indent: string
 ): Promise<string[]> {
   const globalStatements = [
-    'This corpus focuses on exploring scientific principles and natural phenomena',
-    'Core principle: Facts should be verifiable and evidence-based',
-    'This knowledge base emphasizes empirical observations and theoretical frameworks',
-    'Fundamental approach: Build understanding through interconnected facts',
+    "This corpus focuses on exploring scientific principles and natural phenomena",
+    "Core principle: Facts should be verifiable and evidence-based",
+    "This knowledge base emphasizes empirical observations and theoretical frameworks",
+    "Fundamental approach: Build understanding through interconnected facts",
   ];
 
   const factIds: string[] = [];
   const count = Math.floor(Math.random() * 2) + 2; // 2-3 global facts
 
-  console.log(`${indent}🌍 Creating ${count} CORPUS_GLOBAL facts (basis_id must be null)...`);
+  console.log(
+    `${indent}🌍 Creating ${count} CORPUS_GLOBAL facts (basis_id must be null)...`
+  );
 
   for (let i = 0; i < count; i++) {
     globalFactCounter++;
@@ -262,7 +281,7 @@ async function createGlobalFacts(
       `INSERT INTO facts (corpus_id, statement, context, basis_id, state)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [corpusId, statement, FactContext.CORPUS_GLOBAL, null, 'ready']
+      [corpusId, statement, FactContext.CORPUS_GLOBAL, null, "ready"]
     );
     const factId = result[0].id;
     factIds.push(factId);
@@ -278,17 +297,19 @@ async function createBuilderFacts(
   indent: string
 ): Promise<string[]> {
   const builderStatements = [
-    'Auto-generate facts using natural language processing for scientific domains',
-    'Follow this guideline: Cross-reference statements with established scientific databases',
-    'When creating facts, prioritize peer-reviewed sources and academic publications',
-    'Apply validation rule: All measurements must include units and error margins',
-    'Use template: [Subject] + [Action/Property] + [Object/Value] for fact generation',
+    "Auto-generate facts using natural language processing for scientific domains",
+    "Follow this guideline: Cross-reference statements with established scientific databases",
+    "When creating facts, prioritize peer-reviewed sources and academic publications",
+    "Apply validation rule: All measurements must include units and error margins",
+    "Use template: [Subject] + [Action/Property] + [Object/Value] for fact generation",
   ];
 
   const factIds: string[] = [];
   const count = Math.floor(Math.random() * 2) + 2; // 2-3 builder facts
 
-  console.log(`${indent}🔧 Creating ${count} CORPUS_BUILDER facts (basis_id must be null)...`);
+  console.log(
+    `${indent}🔧 Creating ${count} CORPUS_BUILDER facts (basis_id must be null)...`
+  );
 
   for (let i = 0; i < count; i++) {
     globalFactCounter++;
@@ -300,7 +321,7 @@ async function createBuilderFacts(
       `INSERT INTO facts (corpus_id, statement, context, basis_id, state)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [corpusId, statement, FactContext.CORPUS_BUILDER, null, 'ready']
+      [corpusId, statement, FactContext.CORPUS_BUILDER, null, "ready"]
     );
     const factId = result[0].id;
     factIds.push(factId);
@@ -317,37 +338,40 @@ async function createKnowledgeFacts(
   indent: string
 ): Promise<string[]> {
   const knowledgeStatements = [
-    'The sky is blue during the day due to Rayleigh scattering',
-    'Water boils at 100°C at sea level (1 atm pressure)',
-    'The Earth orbits around the Sun in an elliptical path',
-    'Photosynthesis requires sunlight, water, and carbon dioxide',
-    'Gravity pulls objects toward the Earth at 9.8 m/s²',
-    'The speed of light is constant at 299,792,458 m/s in vacuum',
-    'Mitochondria are the powerhouse of the cell, producing ATP',
-    'DNA contains genetic information encoded in nucleotide sequences',
-    'The periodic table organizes elements by atomic number and properties',
-    'Atoms are made of protons, neutrons, and electrons',
-    'Carbon has four valence electrons enabling complex molecules',
-    'Enzymes catalyze biochemical reactions by lowering activation energy',
-    'The human body has 206 bones in adults',
-    'Blood carries oxygen to cells via hemoglobin in red blood cells',
-    'The brain controls the nervous system through neural networks',
-    'Muscles contract and relax to create movement via actin-myosin interaction',
-    'The heart pumps blood throughout the body at 60-100 beats per minute',
-    'Lungs facilitate gas exchange between air and blood',
-    'The liver detoxifies harmful substances and metabolizes nutrients',
-    'Neurons transmit electrical signals via action potentials',
+    "The sky is blue during the day due to Rayleigh scattering",
+    "Water boils at 100°C at sea level (1 atm pressure)",
+    "The Earth orbits around the Sun in an elliptical path",
+    "Photosynthesis requires sunlight, water, and carbon dioxide",
+    "Gravity pulls objects toward the Earth at 9.8 m/s²",
+    "The speed of light is constant at 299,792,458 m/s in vacuum",
+    "Mitochondria are the powerhouse of the cell, producing ATP",
+    "DNA contains genetic information encoded in nucleotide sequences",
+    "The periodic table organizes elements by atomic number and properties",
+    "Atoms are made of protons, neutrons, and electrons",
+    "Carbon has four valence electrons enabling complex molecules",
+    "Enzymes catalyze biochemical reactions by lowering activation energy",
+    "The human body has 206 bones in adults",
+    "Blood carries oxygen to cells via hemoglobin in red blood cells",
+    "The brain controls the nervous system through neural networks",
+    "Muscles contract and relax to create movement via actin-myosin interaction",
+    "The heart pumps blood throughout the body at 60-100 beats per minute",
+    "Lungs facilitate gas exchange between air and blood",
+    "The liver detoxifies harmful substances and metabolizes nutrients",
+    "Neurons transmit electrical signals via action potentials",
   ];
 
-  const states = ['clarify', 'conflict', 'ready', 'confirmed', 'rejected'];
+  const states = ["clarify", "conflict", "ready", "confirmed", "rejected"];
   const factIds: string[] = [];
 
-  console.log(`${indent}📖 Creating ${count} CORPUS_KNOWLEDGE facts (can have basis_id)...`);
+  console.log(
+    `${indent}📖 Creating ${count} CORPUS_KNOWLEDGE facts (can have basis_id)...`
+  );
 
   for (let i = 0; i < count; i++) {
     globalFactCounter++;
     const factNumber = globalFactCounter;
-    const originalStatement = knowledgeStatements[i % knowledgeStatements.length];
+    const originalStatement =
+      knowledgeStatements[i % knowledgeStatements.length];
     const statement = `Fact: ${factNumber}\n${originalStatement}`;
     const state = states[i % states.length];
 
@@ -378,13 +402,17 @@ async function assignBasisFacts(
   );
 
   if (parentFacts.length === 0) {
-    console.error(`${indent}❌ ERROR: No KNOWLEDGE facts in parent corpus to assign as basis`);
+    console.error(
+      `${indent}❌ ERROR: No KNOWLEDGE facts in parent corpus to assign as basis`
+    );
     throw new Error(
       `Cannot create child corpus facts: parent corpus has no KNOWLEDGE facts to use as basis`
     );
   }
 
-  console.log(`${indent}🔗 Assigning basis facts from parent corpus (${parentFacts.length} available)...`);
+  console.log(
+    `${indent}🔗 Assigning basis facts from parent corpus (${parentFacts.length} available)...`
+  );
 
   let assignedCount = 0;
 
@@ -396,7 +424,9 @@ async function assignBasisFacts(
     const basisFactNumber = factIdToNumber.get(randomBasisFact.id);
 
     if (basisFactNumber === undefined) {
-      console.error(`${indent}❌ ERROR: Basis fact ${randomBasisFact.id} not found in fact number mapping`);
+      console.error(
+        `${indent}❌ ERROR: Basis fact ${randomBasisFact.id} not found in fact number mapping`
+      );
       throw new Error(`Cannot find fact number for basis fact`);
     }
 
@@ -408,7 +438,7 @@ async function assignBasisFacts(
 
     const currentStatement = currentFact[0].statement;
     // Insert "Basis: X\n" after the "Fact: X\n" line
-    const factLineEnd = currentStatement.indexOf('\n');
+    const factLineEnd = currentStatement.indexOf("\n");
     const updatedStatement =
       currentStatement.substring(0, factLineEnd + 1) +
       `Basis: ${basisFactNumber}\n` +
@@ -421,7 +451,9 @@ async function assignBasisFacts(
     assignedCount++;
   }
 
-  console.log(`${indent}  ✓ Assigned basis to ALL ${assignedCount}/${factIds.length} KNOWLEDGE facts`);
+  console.log(
+    `${indent}  ✓ Assigned basis to ALL ${assignedCount}/${factIds.length} KNOWLEDGE facts`
+  );
 
   // Verify all facts have basis assigned
   const factsWithoutBasis = await dataSource.query(
@@ -430,7 +462,9 @@ async function assignBasisFacts(
   );
 
   if (factsWithoutBasis.length > 0) {
-    console.error(`${indent}❌ ERROR: ${factsWithoutBasis.length} facts still missing basis!`);
+    console.error(
+      `${indent}❌ ERROR: ${factsWithoutBasis.length} facts still missing basis!`
+    );
     throw new Error(`Failed to assign basis to all facts in child corpus`);
   }
 }
@@ -462,6 +496,75 @@ async function assignSiblingFacts(factIds: string[]): Promise<void> {
   }
 }
 
+async function seedUserProjectViewSettings(
+  user: User,
+  projects: Project[]
+): Promise<void> {
+  console.log("  ⚙️  Creating sample ProjectViewSettings...");
+
+  // Seed settings for 2 out of 3 projects to create variety
+  const projectsToSeed = projects.slice(0, 2);
+
+  for (const project of projectsToSeed) {
+    // Get corpuses for this project
+    const corpuses = await dataSource.query(
+      `SELECT id, name FROM corpuses WHERE project_id = $1 ORDER BY "createdAt"`,
+      [project.id]
+    );
+
+    if (corpuses.length === 0) {
+      continue;
+    }
+
+    // Get some facts from the first corpus for expanded stacks
+    const firstCorpusFacts = await dataSource.query(
+      `SELECT id FROM facts WHERE corpus_id = $1 LIMIT 5`,
+      [corpuses[0].id]
+    );
+
+    // Build settings JSON with variety of configurations
+    const corpusSettings: Record<string, any> = {};
+
+    // Configure settings for first 2-3 corpuses (not all)
+    const corpusesToConfigure = corpuses.slice(0, Math.min(3, corpuses.length));
+
+    for (let i = 0; i < corpusesToConfigure.length; i++) {
+      const corpus = corpusesToConfigure[i];
+      const isFirstCorpus = i === 0;
+      const isSecondCorpus = i === 1;
+
+      corpusSettings[corpus.id] = {
+        scrollPosition: 0,
+        columnWidth: 1,
+        stackView: isFirstCorpus ? true : false,
+        expandedStacks:
+          isFirstCorpus && firstCorpusFacts.length > 0
+            ? [firstCorpusFacts[0].id, firstCorpusFacts[1]?.id].filter(Boolean)
+            : [],
+      };
+    }
+
+    const settings = {
+      corpuses: corpusSettings,
+    };
+
+    // Insert ProjectViewSettings
+    await dataSource.query(
+      `INSERT INTO project_view_settings (user_id, project_id, settings)
+       VALUES ($1, $2, $3)`,
+      [user.id, project.id, JSON.stringify(settings)]
+    );
+
+    console.log(
+      `    ✓ Created view settings for "${project.name}" (${Object.keys(corpusSettings).length} corpus configs)`
+    );
+  }
+
+  console.log(
+    `  ✅ Created view settings for ${projectsToSeed.length}/${projects.length} projects`
+  );
+}
+
 async function validateContextConstraints(): Promise<void> {
   // Check for GLOBAL facts with basis_id
   const invalidGlobalFacts = await dataSource.query(
@@ -471,11 +574,15 @@ async function validateContextConstraints(): Promise<void> {
   );
 
   if (invalidGlobalFacts.length > 0) {
-    console.error('  ❌ ERROR: Found CORPUS_GLOBAL facts with basis_id (must be null):');
+    console.error(
+      "  ❌ ERROR: Found CORPUS_GLOBAL facts with basis_id (must be null):"
+    );
     invalidGlobalFacts.forEach((fact: any) => {
       console.error(`    - ${fact.id}: ${fact.statement.substring(0, 60)}...`);
     });
-    throw new Error('Context constraint violation: GLOBAL facts cannot have basis_id');
+    throw new Error(
+      "Context constraint violation: GLOBAL facts cannot have basis_id"
+    );
   }
 
   // Check for BUILDER facts with basis_id
@@ -486,11 +593,15 @@ async function validateContextConstraints(): Promise<void> {
   );
 
   if (invalidBuilderFacts.length > 0) {
-    console.error('  ❌ ERROR: Found CORPUS_BUILDER facts with basis_id (must be null):');
+    console.error(
+      "  ❌ ERROR: Found CORPUS_BUILDER facts with basis_id (must be null):"
+    );
     invalidBuilderFacts.forEach((fact: any) => {
       console.error(`    - ${fact.id}: ${fact.statement.substring(0, 60)}...`);
     });
-    throw new Error('Context constraint violation: BUILDER facts cannot have basis_id');
+    throw new Error(
+      "Context constraint violation: BUILDER facts cannot have basis_id"
+    );
   }
 
   // Check for KNOWLEDGE facts with basis pointing to non-KNOWLEDGE facts
@@ -503,11 +614,17 @@ async function validateContextConstraints(): Promise<void> {
   );
 
   if (invalidKnowledgeBasis.length > 0) {
-    console.error('  ❌ ERROR: Found CORPUS_KNOWLEDGE facts with non-KNOWLEDGE basis:');
+    console.error(
+      "  ❌ ERROR: Found CORPUS_KNOWLEDGE facts with non-KNOWLEDGE basis:"
+    );
     invalidKnowledgeBasis.forEach((fact: any) => {
-      console.error(`    - ${fact.id}: basis has context ${fact.basis_context}`);
+      console.error(
+        `    - ${fact.id}: basis has context ${fact.basis_context}`
+      );
     });
-    throw new Error('Context constraint violation: KNOWLEDGE facts must reference KNOWLEDGE basis');
+    throw new Error(
+      "Context constraint violation: KNOWLEDGE facts must reference KNOWLEDGE basis"
+    );
   }
 
   // Check that ALL KNOWLEDGE facts in child corpuses have a basis
@@ -522,11 +639,17 @@ async function validateContextConstraints(): Promise<void> {
   );
 
   if (knowledgeFactsWithoutBasisInChildCorpuses.length > 0) {
-    console.error('  ❌ ERROR: Found CORPUS_KNOWLEDGE facts in child corpuses without basis:');
+    console.error(
+      "  ❌ ERROR: Found CORPUS_KNOWLEDGE facts in child corpuses without basis:"
+    );
     knowledgeFactsWithoutBasisInChildCorpuses.forEach((fact: any) => {
-      console.error(`    - ${fact.id} in "${fact.corpus_name}": ${fact.statement.substring(0, 60)}...`);
+      console.error(
+        `    - ${fact.id} in "${fact.corpus_name}": ${fact.statement.substring(0, 60)}...`
+      );
     });
-    throw new Error('Constraint violation: KNOWLEDGE facts in child corpuses must have basis from parent corpus');
+    throw new Error(
+      "Constraint violation: KNOWLEDGE facts in child corpuses must have basis from parent corpus"
+    );
   }
 
   // Show statistics
@@ -541,11 +664,13 @@ async function validateContextConstraints(): Promise<void> {
      ORDER BY context`
   );
 
-  console.log('  ✅ All context constraints validated successfully!\n');
-  console.log('  📊 Fact Statistics by Context:');
+  console.log("  ✅ All context constraints validated successfully!\n");
+  console.log("  📊 Fact Statistics by Context:");
   stats.forEach((stat: any) => {
-    const contextName = stat.context.replace('corpus_', '').toUpperCase();
-    console.log(`    ${contextName}: ${stat.count} total (${stat.with_basis} with basis, ${stat.without_basis} without)`);
+    const contextName = stat.context.replace("corpus_", "").toUpperCase();
+    console.log(
+      `    ${contextName}: ${stat.count} total (${stat.with_basis} with basis, ${stat.without_basis} without)`
+    );
   });
 }
 

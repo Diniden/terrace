@@ -12,6 +12,7 @@ import { FactModule } from './modules/fact/fact.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { RagModule } from './rag/rag.module';
+import { ProjectViewSettingsModule } from './modules/project-view-settings/project-view-settings.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RagModule } from './rag/rag.module';
     FactModule,
     AdminModule,
     ChatModule,
+    ProjectViewSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -18,13 +18,14 @@ interface FactStackProps {
   dependentsCount?: number;
   onExpand?: (stack: FactStackType) => void;
   onCollapse?: (stack: FactStackType) => void;
+  initialExpanded?: boolean;
 }
 
 export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
-  ({ stack, onUpdate, viewContext, onNavigateToBasis, onNavigateToDependents, dependentsCount = 0, onExpand, onCollapse }, ref) => {
+  ({ stack, onUpdate, viewContext, onNavigateToBasis, onNavigateToDependents, dependentsCount = 0, onExpand, onCollapse, initialExpanded = false }, ref) => {
     const { topFact, supportCount, facts } = stack;
     const isStack = supportCount > 0;
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
     const handleBadgeClick = (e: React.MouseEvent) => {
       e.stopPropagation();

@@ -123,3 +123,31 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
 }
+
+// ProjectViewSettings
+export interface CorpusSettings {
+  scrollPosition: number;
+  columnWidth: number;
+  stackView: boolean;
+  expandedStacks: string[]; // Array of fact IDs that are expanded in stack view
+}
+
+export interface ProjectViewSettings {
+  id: string;
+  userId: string;
+  projectId: string;
+  settings: {
+    scrollX: number;
+    corpuses: Record<string, CorpusSettings>; // corpusId -> settings
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveProjectViewSettingsDto {
+  projectId: string;
+  settings: {
+    scrollX: number;
+    corpuses: Record<string, CorpusSettings>;
+  };
+}

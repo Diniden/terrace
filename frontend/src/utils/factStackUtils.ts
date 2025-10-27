@@ -1,4 +1,4 @@
-import type { Fact } from '../types';
+import type { Fact } from "../types";
 
 /**
  * Represents a stack of related Facts, with the top Fact being the primary one
@@ -49,24 +49,29 @@ export function computeFactStacks(facts: Fact[]): FactStack[] {
     const supportingFacts: Fact[] = [];
 
     // Add facts that support this fact (supportedBy relationship)
-    (fact.supportedBy || []).forEach((supportFact) => {
-      if (supportFact.context === fact.context &&
-          !processedFactIds.has(supportFact.id) &&
-          !supportingFactsSet.has(supportFact.id)) {
+    for (let i = 0, iMax = (fact.supportedBy || []).length; i < iMax; i++) {
+      const supportFact = (fact.supportedBy || [])[i];
+      if (
+        supportFact.context === fact.context &&
+        !processedFactIds.has(supportFact.id) &&
+        !supportingFactsSet.has(supportFact.id)
+      ) {
         supportingFactsSet.add(supportFact.id);
-        supportingFacts.push(supportFact);
       }
-    });
+      supportingFacts.push(supportFact);
+    }
 
-    // Add facts that this fact supports (bidirectional relationship)
-    (fact.supports || []).forEach((supportFact) => {
-      if (supportFact.context === fact.context &&
-          !processedFactIds.has(supportFact.id) &&
-          !supportingFactsSet.has(supportFact.id)) {
+    for (let i = 0, iMax = (fact.supports || []).length; i < iMax; i++) {
+      const supportFact = (fact.supports || [])[i];
+      if (
+        supportFact.context === fact.context &&
+        !processedFactIds.has(supportFact.id) &&
+        !supportingFactsSet.has(supportFact.id)
+      ) {
         supportingFactsSet.add(supportFact.id);
-        supportingFacts.push(supportFact);
       }
-    });
+      supportingFacts.push(supportFact);
+    }
 
     // Create a stack with this fact on top and all supporting facts
     const stackFacts = [fact, ...supportingFacts];
