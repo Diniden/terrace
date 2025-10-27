@@ -111,21 +111,37 @@ These constraints MUST be enforced at multiple layers:
 - Triggers enforce constraints at database level regardless of application logic
 - Context validation is CRITICAL and must reject invalid relationships at database level
 
-### 6. Migration Management
+### 6. ProjectViewSettings Domain Model
+- **Purpose**: User-scoped, project-scoped configuration model for persisting view preferences
+- **Relationship**: One ProjectViewSettings per User per Project (composite unique constraint on userId + projectId)
+- **Storage**: JSON-based settings containing scroll positions, corpus configurations, and fact stack states
+- **Database Design**:
+  - Table: `project_view_settings`
+  - Columns: `id` (uuid), `user_id` (fk to users), `project_id` (fk to projects), `settings` (jsonb), `created_at`, `updated_at`
+  - Unique constraint: `(user_id, project_id)` - one setting per user per project
+  - Indexes: `user_id`, `project_id` for efficient queries
+  - Foreign keys with cascade: Delete settings when User or Project is deleted
+- **JSON Structure** (not enforced at database level, but application/API validates):
+  - `scrollPositions`: Object with key-value pairs (e.g., `{ corpusViewY: 123, factStackX: 456 }`)
+  - `corpusColumnWidths`: Object with corpus IDs as keys and widths as values (e.g., `{ 'corpus-1': 350 }`)
+  - `factStackExpansionStates`: Object with fact IDs as keys and boolean expansion state as values
+- **No Implementation Details**: Schema validation is handled at service/API layer, not database
+
+### 7. Migration Management
 - Generate migrations for all schema changes
 - Write safe, reversible migrations
 - Handle data migrations when needed
 - Test migrations in development first
 - Understand migration must run after entities for triggers to work properly
 
-### 7. Repository Pattern
+### 8. Repository Pattern
 - Create custom repositories for complex queries
 - Implement Fact graph traversal methods
 - Implement Corpus hierarchy queries
 - Use QueryBuilder for complex operations
 - Optimize queries with proper joins and relations
 
-### 8. Database Performance
+### 9. Database Performance
 - Add indexes on frequently queried fields (corpusId, basisId, state)
 - Optimize Fact graph traversal queries using recursive CTEs
 - Optimize Corpus hierarchy queries

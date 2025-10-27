@@ -2,7 +2,7 @@ import React from "react";
 import "./PageHeader.css";
 
 interface PageHeaderProps {
-  title: string;
+  title: string | React.ReactNode;
   userEmail?: string | null;
   actions?: React.ReactNode;
 }

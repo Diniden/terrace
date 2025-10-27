@@ -8,7 +8,7 @@ export interface FactStack {
   topFact: Fact;
   /** All Facts in the stack (includes topFact) */
   facts: Fact[];
-  /** Number of Facts that support the topFact (via supportsFacts relationship) */
+  /** Number of Facts that support the topFact (bidirectional: supportedBy + supports) */
   supportCount: number;
 }
 
@@ -19,13 +19,15 @@ export interface FactStack {
  * - Start with the list of Facts
  * - Create a Set to track which Facts are already stacked
  * - For each unprocessed Fact:
- *   - Gather all supporting Facts to that Fact (supportsFacts relationship)
+ *   - Gather all supporting Facts using BIDIRECTIONAL relationships:
+ *     * Facts that support this fact (supportedBy relationship)
+ *     * Facts that this fact supports (supports relationship)
+ *   - Filter by same context and exclude already processed facts
  *   - Do not include any Facts already in the Set
  *   - These gathered Facts form the Stack with the current Fact on top
  *   - Add all gathered Facts to the Set
- * - After creating all stacks, calculate supportCount for each:
- *   - Count how many facts in the entire list have the topFact.id in their supportsFacts array
- *   - This represents the actual number of supporting facts for the top fact
+ * - The supportCount equals the number of bidirectional supporting facts
+ * - This matches FactView's logic for displaying supporting facts
  *
  * @param facts - Array of Facts to organize into stacks
  * @returns Array of FactStacks
@@ -41,9 +43,30 @@ export function computeFactStacks(facts: Fact[]): FactStack[] {
     }
 
     // Gather all supporting facts that haven't been processed yet
-    const supportingFacts = (fact.supports || []).filter(
-      (supportFact) => !processedFactIds.has(supportFact.id)
-    );
+    // Use bidirectional approach: combine both supportedBy and supports arrays
+    // This matches FactView's logic (lines 227-245)
+    const supportingFactsSet = new Set<string>();
+    const supportingFacts: Fact[] = [];
+
+    // Add facts that support this fact (supportedBy relationship)
+    (fact.supportedBy || []).forEach((supportFact) => {
+      if (supportFact.context === fact.context &&
+          !processedFactIds.has(supportFact.id) &&
+          !supportingFactsSet.has(supportFact.id)) {
+        supportingFactsSet.add(supportFact.id);
+        supportingFacts.push(supportFact);
+      }
+    });
+
+    // Add facts that this fact supports (bidirectional relationship)
+    (fact.supports || []).forEach((supportFact) => {
+      if (supportFact.context === fact.context &&
+          !processedFactIds.has(supportFact.id) &&
+          !supportingFactsSet.has(supportFact.id)) {
+        supportingFactsSet.add(supportFact.id);
+        supportingFacts.push(supportFact);
+      }
+    });
 
     // Create a stack with this fact on top and all supporting facts
     const stackFacts = [fact, ...supportingFacts];
@@ -51,9 +74,8 @@ export function computeFactStacks(facts: Fact[]): FactStack[] {
     // Mark all facts in this stack as processed
     stackFacts.forEach((f) => processedFactIds.add(f.id));
 
-    // Count how many facts support this topFact
-    // This is the number of facts that have this fact in their supportsFacts array
-    const supportCount = fact.supportedBy?.length || 0;
+    // Count the bidirectional supporting facts (matches supportingFacts.length)
+    const supportCount = supportingFacts.length;
 
     // Create the stack
     stacks.push({

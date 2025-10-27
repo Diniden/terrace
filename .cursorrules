@@ -25,7 +25,8 @@ This project uses a multi-agent system where specialized Claude agents handle di
 - **E2E Testing**: Playwright with MCP browser access
 - **Graph Models**: Facts/Corpuses domain model with parent-child corpus hierarchy
 
-### 4. Domain Model: Facts, Corpuses, and Context (CRITICAL)
+### 4. Domain Model: Facts, Corpuses, Context, and ProjectViewSettings (CRITICAL)
+
 **Corpuses**: Collections of Facts grouped within Projects
 - Each Corpus belongs to exactly one Project
 - Corpuses form a parent-child hierarchy via `basis_corpus_id`
@@ -39,6 +40,15 @@ This project uses a multi-agent system where specialized Claude agents handle di
 - Facts have a state machine: CLARIFY (no statement), CONFLICT, READY, REJECTED, CONFIRMED
 - Auto-transitions to CLARIFY when statement is empty or null
 - Flexible metadata stored as JSONB (`meta` column)
+
+**ProjectViewSettings**: User-scoped, project-scoped view configuration persistence (NEW)
+- One ProjectViewSettings per User per Project combination
+- Composite unique constraint on (userId, projectId) at database level
+- Stores user's view preferences in JSON format: scroll positions, corpus column widths, fact stack expansion states
+- Settings are loaded when ProjectDetailPage mounts
+- Settings are saved when user navigates away, adjusts columns, toggles expansion, or refreshes page
+- No partial updates: settings JSON is always replaced in full
+- Foreign keys with cascade delete: when User or Project is deleted, related ProjectViewSettings are deleted
 
 **Context-Specific Constraints** (MANDATORY - enforced at multiple layers):
 - **CORPUS_GLOBAL** (foundation facts): Cannot have basis (`basis_id` MUST be null), can only support other GLOBAL facts
@@ -232,3 +242,5 @@ All agents working with backend code MUST:
 - **Support**: Many-to-many relationships between Facts in same Corpus with same context (validates via trigger)
 - **Trigger**: Database-level constraint enforcement (5 triggers including new context validation trigger)
 - **Context Constraint**: GLOBAL/BUILDER cannot have basis, can only support same-context facts; KNOWLEDGE can have basis from parent KNOWLEDGE facts
+- **ProjectViewSettings**: User-scoped project configuration (one per user per project) containing scroll positions, column widths, and expansion states in JSON format
+- **Settings Persistence**: Automatic save on navigation, column adjustments, expansion toggles, and page refresh; automatic load on page mount

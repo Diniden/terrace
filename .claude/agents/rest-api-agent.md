@@ -47,6 +47,7 @@ You are a master of NestJS and understand:
 - **Natural language fact query endpoints** (delegates to Python RAG service)
 - **Admin endpoints for embedding status and management**
 - **Error handling for Python RAG service failures** (graceful degradation)
+- **ProjectViewSettings REST endpoints** (GET, POST, DELETE for user-scoped view settings)
 
 ## Responsibilities
 
@@ -343,6 +344,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
   - New corpus can have facts with all contexts
 - `PATCH /corpuses/:id` - Update a corpus
 - `DELETE /corpuses/:id` - Delete a corpus (cascades to facts with all contexts)
+
+### ProjectViewSettings Endpoints (NEW)
+- `GET /project-view-settings/:projectId` - Retrieve current user's settings for a project
+  - Returns settings JSON or empty object if not found
+  - Status 200 with settings object (may be empty)
+  - Status 403 if user doesn't have access to project
+- `POST /project-view-settings/:projectId` - Save/upsert current user's settings for a project
+  - Request body: `{ settings: { scrollPositions?: {...}, corpusColumnWidths?: {...}, factStackExpansionStates?: {...} } }`
+  - Creates settings if not exist, updates if exist (full JSON replacement)
+  - Status 201 for create, 200 for update
+  - Status 400 if settings JSON is malformed
+  - Status 403 if user doesn't have access to project
+- `DELETE /project-view-settings/:projectId` - Delete current user's settings for a project
+  - Status 204 on success
+  - Status 403 if user doesn't have access to project
+  - Graceful if settings don't exist (204 anyway)
+- All endpoints require authentication (JWT guard)
+- All endpoints verify user has access to project
 
 ## Workflow
 

@@ -63,6 +63,7 @@ RAG integration is **backend-only** in this phase:
 - **Playwright E2E testing with MCP browser access**
 - **Testing against live development server**
 - **Integration testing with NestJS backend**
+- **ProjectViewSettings integration**: Load and save user preferences for scroll positions, column widths, fact stack expansion states
 
 ## Responsibilities
 
@@ -118,7 +119,28 @@ RAG integration is **backend-only** in this phase:
 - Ensure responsive design
 - Implement accessibility features
 
-### 6. Component Documentation & Testing with Storybook
+### 6. ProjectViewSettings Integration
+
+- **Load Settings on Page Mount**: Fetch ProjectViewSettings when ProjectDetailPage mounts
+  - Call `GET /project-view-settings/:projectId` to retrieve user's saved view preferences
+  - Apply scroll positions to view containers after DOM is ready
+  - Apply corpus column widths to component state
+  - Apply fact stack expansion states to FactStack components
+  - Handle gracefully if settings don't exist (use defaults)
+- **Save Settings on User Actions**: Persist view preferences to backend
+  - Save on navigation away from project view page (beforeunload, useEffect cleanup)
+  - Save on scroll position changes (with throttling/debouncing to prevent excessive API calls)
+  - Save when user adjusts corpus column widths (on resize end)
+  - Save when user toggles fact stack expansion states
+  - Save when corpus is added or removed from view
+- **Settings Structure**: JSON object with following keys:
+  - `scrollPositions`: Object with scroll position values (e.g., `{ corpusViewY: 250 }`)
+  - `corpusColumnWidths`: Object with corpus IDs as keys, pixel widths as values
+  - `factStackExpansionStates`: Object with fact IDs as keys, boolean expansion state as values
+- **Error Handling**: Log errors but don't break user experience if settings API fails
+- **No Blocking Operations**: Settings save/load should be async, non-blocking
+
+### 7. Component Documentation & Testing with Storybook
 
 - Create Storybook stories for every component
 - Document component props and usage

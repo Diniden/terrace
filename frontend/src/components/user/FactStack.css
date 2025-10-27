@@ -3,11 +3,16 @@
 .factStack {
   position: relative;
   min-height: 80px;
-  min-width: 200px;
-  width: 100%;
+  /* Static width for flex-wrap layout - matches FactCard width */
+  flex-shrink: 0;
+  width: calc(var(--corpus-column-width) - var(--spacing-lg));
   /* Add padding to make room for offset background layers */
   padding-bottom: 12px;
   padding-right: 12px;
+  /* Smooth width transition for expand/collapse */
+  transition:
+    width var(--transition-base),
+    padding var(--transition-base);
 }
 
 /* Layer positioning - creates the stacked effect */
@@ -18,7 +23,8 @@
   width: calc(100% - 12px);
   transition:
     transform var(--transition-base),
-    opacity var(--transition-base);
+    opacity var(--transition-base),
+    visibility var(--transition-base);
   height: 100%;
 }
 
@@ -53,15 +59,15 @@
   /* Match the min-height of FactCard to allow content to grow */
   min-height: 80px;
   height: 100%;
-  width: 100%;
+  width: calc(var(--corpus-column-width) - var(--spacing-lg));
 }
 
 /* Stack count badge - pill-shaped, stretches for multi-digit numbers */
 .factStack__badge {
   position: absolute;
   /* Match the positioning of the status icon (4px from edges) */
-  bottom: 16px;
-  right: 28px;
+  bottom: 4px;
+  right: 4px;
   /* Match the size of the status icon (14px) */
   min-width: 14px;
   height: 14px;
@@ -79,8 +85,16 @@
   font-weight: var(--font-weight-bold);
   box-shadow: var(--shadow-md);
   z-index: 10;
-  cursor: default;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.factStack__badge:hover {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Hover effect - spread the layers slightly */
@@ -92,4 +106,118 @@
 .factStack:hover .factStack__layer--middle {
   transform: translate(6px, 6px) rotate(1.25deg);
   opacity: 0.8;
+}
+
+/* Expanded state styles */
+.factStack--expanded {
+  position: relative;
+  padding-bottom: 0;
+  padding-right: 0;
+  min-height: auto;
+  width: 100%;
+}
+
+/* Expanded background overlay - darkened, clickable */
+.factStack__expandedBackground {
+  position: absolute;
+  top: -16px;
+  left: -16px;
+  right: -16px;
+  bottom: -16px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  z-index: 0;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    opacity var(--transition-base);
+  /* Fade-in animation */
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+.factStack__expandedBackground:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Keyframe for fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Container for expanded cards */
+.factStack__expandedContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  /* Smooth expand animation with scale and fade */
+  animation: expandContent var(--transition-base) ease-out;
+  transform-origin: top left;
+  cursor: pointer;
+  /* Add transition for smooth background change */
+  transition: background-color var(--transition-base);
+}
+
+/* Hover effect on expandedContent - only when NOT hovering over cards */
+.factStack__expandedContent:not(:has(.factStack__expandedCard:hover)):hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-md);
+}
+
+/* Individual cards in expanded view */
+.factStack__expandedCard {
+  flex-shrink: 0;
+  /* Stagger animation for each card */
+  animation: slideInCard var(--transition-base) ease-out backwards;
+}
+
+/* Stagger animation delay for each card */
+.factStack__expandedCard:nth-child(1) {
+  animation-delay: 0ms;
+}
+.factStack__expandedCard:nth-child(2) {
+  animation-delay: 50ms;
+}
+.factStack__expandedCard:nth-child(3) {
+  animation-delay: 100ms;
+}
+.factStack__expandedCard:nth-child(4) {
+  animation-delay: 150ms;
+}
+.factStack__expandedCard:nth-child(5) {
+  animation-delay: 200ms;
+}
+.factStack__expandedCard:nth-child(n + 6) {
+  animation-delay: 250ms;
+}
+
+/* Keyframe for expanded content container */
+@keyframes expandContent {
+  from {
+    opacity: 0;
+    transform: scaleY(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Keyframe for individual card slide-in */
+@keyframes slideInCard {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

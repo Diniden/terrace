@@ -34,6 +34,7 @@
   height: 100%;
   flex-shrink: 0;
   /* Width is dynamically set via inline style based on column count */
+  transition: width var(--transition-base);
 }
 
 /* FactCard width is now controlled by grid layout */
@@ -52,13 +53,20 @@
   flex-direction: column;
   gap: var(--spacing-md);
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--spacing-sm);
   min-height: 0;
+  /* Remove bottom padding to eliminate gap before actions */
+  padding-bottom: 0;
+}
+
+.projectDetailPage__corpusFacts .factCard {
+  width: calc(var(--corpus-column-width) - var(--spacing-lg));
 }
 
 .projectDetailPage__corpusActions {
   flex-shrink: 0;
-  width: 50px;
+  width: var(--corpus-actions-width);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -75,8 +83,21 @@
 }
 
 .projectDetailPage__factsList {
-  /* Grid layout is set via inline styles in component for dynamic columns */
+  /* Flex-wrap layout - facts have static widths, container adjusts naturally */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+  align-content: flex-start;
   width: 100%;
+  /* Remove bottom padding to eliminate gap before actions */
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* Remove individual fact padding-bottom in project detail page to prevent gap accumulation */
+.projectDetailPage__factsList .factStack {
+  padding-bottom: 0;
 }
 
 .projectDetailPage__expandColumnsButton {

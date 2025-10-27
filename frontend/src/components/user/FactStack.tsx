@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { FactCard } from './FactCard';
 import type { FactState } from '../../types';
 import type { FactStack as FactStackType } from '../../utils/factStackUtils';
@@ -16,12 +16,39 @@ interface FactStackProps {
   onNavigateToBasis?: (basisId: string) => void;
   onNavigateToDependents?: (factId: string) => void;
   dependentsCount?: number;
+  onExpand?: (stack: FactStackType) => void;
+  onCollapse?: (stack: FactStackType) => void;
 }
 
 export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
-  ({ stack, onUpdate, viewContext, onNavigateToBasis, onNavigateToDependents, dependentsCount = 0 }, ref) => {
-    const { topFact, supportCount } = stack;
+  ({ stack, onUpdate, viewContext, onNavigateToBasis, onNavigateToDependents, dependentsCount = 0, onExpand, onCollapse }, ref) => {
+    const { topFact, supportCount, facts } = stack;
     const isStack = supportCount > 0;
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const handleBadgeClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!isExpanded) {
+        setIsExpanded(true);
+        onExpand?.(stack);
+      }
+    };
+
+    const handleBackgroundClick = () => {
+      if (isExpanded) {
+        setIsExpanded(false);
+        onCollapse?.(stack);
+      }
+    };
+
+    const handleExpandedContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      // Only collapse if the click was directly on the expandedContent container,
+      // not on any of its children (FactCards)
+      if (e.target === e.currentTarget && isExpanded) {
+        setIsExpanded(false);
+        onCollapse?.(stack);
+      }
+    };
 
     if (!isStack) {
       // Render as a single FactCard if there are no supporting facts
@@ -39,31 +66,71 @@ export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
     }
 
     return (
-      <div ref={ref} className="factStack">
-        {/* Background card layers (only visible corners) */}
-        <div className="factStack__layer factStack__layer--bottom" aria-hidden="true">
-          <div className="factStack__layerCard" />
-        </div>
-        <div className="factStack__layer factStack__layer--middle" aria-hidden="true">
-          <div className="factStack__layerCard" />
-        </div>
-
-        {/* Top card - full FactCard */}
-        <div className="factStack__layer factStack__layer--top">
-          <FactCard
-            fact={topFact}
-            onUpdate={onUpdate}
-            viewContext={viewContext}
-            onNavigateToBasis={onNavigateToBasis}
-            onNavigateToDependents={onNavigateToDependents}
-            dependentsCount={dependentsCount}
+      <div ref={ref} className={`factStack ${isExpanded ? 'factStack--expanded' : ''}`}>
+        {/* Expanded background overlay - clickable to collapse */}
+        {isExpanded && (
+          <div
+            className="factStack__expandedBackground"
+            onClick={handleBackgroundClick}
+            aria-label="Click to collapse stack"
           />
-        </div>
+        )}
 
-        {/* Stack count badge showing number of supporting facts */}
-        <div className="factStack__badge" title={`${supportCount} supporting fact${supportCount !== 1 ? 's' : ''}`}>
-          {supportCount}
-        </div>
+        {/* Background card layers (only visible when collapsed) */}
+        {!isExpanded && (
+          <>
+            <div className="factStack__layer factStack__layer--bottom" aria-hidden="true">
+              <div className="factStack__layerCard" />
+            </div>
+            <div className="factStack__layer factStack__layer--middle" aria-hidden="true">
+              <div className="factStack__layerCard" />
+            </div>
+          </>
+        )}
+
+        {/* Expanded state - render all facts in the stack */}
+        {isExpanded ? (
+          <div
+            className="factStack__expandedContent"
+            onClick={handleExpandedContentClick}
+          >
+            {facts.map((fact, index) => (
+              <div key={fact.id} className="factStack__expandedCard">
+                <FactCard
+                  fact={fact}
+                  onUpdate={onUpdate}
+                  viewContext={viewContext}
+                  onNavigateToBasis={onNavigateToBasis}
+                  onNavigateToDependents={onNavigateToDependents}
+                  dependentsCount={index === 0 ? dependentsCount : undefined}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Collapsed state - render only top card */
+          <div className="factStack__layer factStack__layer--top">
+            <FactCard
+              fact={topFact}
+              onUpdate={onUpdate}
+              viewContext={viewContext}
+              onNavigateToBasis={onNavigateToBasis}
+              onNavigateToDependents={onNavigateToDependents}
+              dependentsCount={dependentsCount}
+            />
+          </div>
+        )}
+
+        {/* Stack count badge showing number of supporting facts - clickable to expand */}
+        {!isExpanded && (
+          <div
+            className="factStack__badge"
+            title={`${supportCount} supporting fact${supportCount !== 1 ? 's' : ''} - Click to expand`}
+            onClick={handleBadgeClick}
+          >
+            {supportCount}
+          </div>
+        )}
       </div>
     );
   }

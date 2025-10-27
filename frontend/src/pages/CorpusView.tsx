@@ -163,12 +163,14 @@ export const CorpusView: React.FC = () => {
   const handleAddGlobalFact = async () => {
     if (!corpusId) return;
     try {
-      await factsApi.create({
+      const newFact = await factsApi.create({
         corpusId,
         context: FactContextEnum.CORPUS_GLOBAL,
         state: FactStateEnum.CLARIFY,
       });
-      await loadCorpusData();
+
+      // Add the new fact to local state immediately at the beginning
+      setFacts((prevFacts) => [newFact, ...prevFacts]);
     } catch (err) {
       console.error("Failed to create global fact:", err);
     }
@@ -177,12 +179,14 @@ export const CorpusView: React.FC = () => {
   const handleAddBuilderFact = async () => {
     if (!corpusId) return;
     try {
-      await factsApi.create({
+      const newFact = await factsApi.create({
         corpusId,
         context: FactContextEnum.CORPUS_BUILDER,
         state: FactStateEnum.CLARIFY,
       });
-      await loadCorpusData();
+
+      // Add the new fact to local state immediately at the beginning
+      setFacts((prevFacts) => [newFact, ...prevFacts]);
     } catch (err) {
       console.error("Failed to create builder fact:", err);
     }
@@ -191,12 +195,25 @@ export const CorpusView: React.FC = () => {
   const handleAddKnowledgeFact = async () => {
     if (!corpusId) return;
     try {
-      await factsApi.create({
+      const newFact = await factsApi.create({
         corpusId,
         context: FactContextEnum.CORPUS_KNOWLEDGE,
         state: FactStateEnum.CLARIFY,
       });
-      await loadCorpusData();
+
+      // Add the new fact to local state immediately at the beginning
+      setFacts((prevFacts) => [newFact, ...prevFacts]);
+
+      // Scroll knowledge column to top to show the new fact
+      const knowledgeColumnElement = document.querySelector(
+        ".corpusView__knowledgeColumnContent .corpusView__factsList"
+      );
+      if (knowledgeColumnElement) {
+        knowledgeColumnElement.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
     } catch (err) {
       console.error("Failed to create knowledge fact:", err);
     }
@@ -380,7 +397,7 @@ export const CorpusView: React.FC = () => {
         <div
           className="corpusView__knowledgeColumn"
           style={{
-            width: `calc(var(--corpus-column-width) * ${knowledgeColumnCount})`,
+            width: `calc(var(--corpus-column-width) * ${knowledgeColumnCount} + var(--corpus-actions-width))`,
           }}
         >
           <div className="corpusView__regionHeader">Knowledge Base</div>
@@ -391,15 +408,7 @@ export const CorpusView: React.FC = () => {
                   <p>No knowledge facts yet</p>
                 </div>
               ) : stackViewByRegion.knowledge ? (
-                <div
-                  className="corpusView__factsList"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${knowledgeColumnCount}, 1fr)`,
-                    gap: "var(--spacing-lg)",
-                    alignItems: "start",
-                  }}
-                >
+                <div className="corpusView__factsList">
                   {knowledgeStacks.map((stack) => (
                     <FactStack
                       key={stack.topFact.id}
@@ -410,15 +419,7 @@ export const CorpusView: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div
-                  className="corpusView__factsList"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${knowledgeColumnCount}, 1fr)`,
-                    gap: "var(--spacing-lg)",
-                    alignItems: "start",
-                  }}
-                >
+                <div className="corpusView__factsList">
                   {knowledgeFacts.map((fact) => (
                     <FactCard
                       key={fact.id}

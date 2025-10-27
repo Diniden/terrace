@@ -79,6 +79,7 @@
   height: 100%;
   border-right: 1px solid var(--color-grey-200);
   padding-right: var(--spacing-md);
+  transition: width var(--transition-base);
 }
 
 .corpusView__knowledgeColumnInner {
@@ -94,11 +95,17 @@
   overflow-y: auto;
   padding: var(--spacing-sm);
   min-height: 0;
+  /* Remove bottom padding to eliminate gap - facts list has its own spacing */
+  padding-bottom: 0;
+}
+
+.corpusView__knowledgeColumnContent .factCard {
+  width: calc(var(--corpus-column-width) - var(--spacing-lg));
 }
 
 .corpusView__knowledgeColumnActions {
   flex-shrink: 0;
-  width: 50px;
+  width: var(--corpus-actions-width);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -215,8 +222,21 @@
 
 /* Facts List (for corpus column) */
 .corpusView__factsList {
-  /* Grid layout is set via inline styles in component for dynamic columns */
+  /* Flex-wrap layout - facts have static widths, container adjusts naturally */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+  align-content: flex-start;
   width: 100%;
+  /* Remove bottom padding to eliminate gap before actions */
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* Remove individual fact padding-bottom in corpus column to prevent gap accumulation */
+.corpusView__factsList .factStack {
+  padding-bottom: 0;
 }
 
 /* Empty State */

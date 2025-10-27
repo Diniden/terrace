@@ -55,6 +55,8 @@ This project consists of:
   - Generate CORPUS_BUILDER facts with null basis_id
   - Generate CORPUS_KNOWLEDGE facts with proper basis relationships
   - Ensure context constraints are not violated during seeding
+  - Generate sample ProjectViewSettings for seeded users and projects
+  - Populate with realistic settings (scroll positions, column widths, expansion states)
 - Build backup and restore scripts
 - Handle database reset for development
 

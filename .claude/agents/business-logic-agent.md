@@ -96,7 +96,24 @@ You are a master of NestJS services and understand:
 - Handle Fact decoupling when corpus changes (trigger: `decouple_fact_relationships_on_corpus_change()`)
 - Implement graph traversal algorithms on Fact relationships with context filtering
 
-### 4. Graph Operations
+### 4. ProjectViewSettings Operations
+- **Implement ProjectViewSettings service** for CRUD operations:
+  - Create settings for user-project combination (upsert if exists)
+  - Read settings by userId and projectId
+  - Update settings with full JSON replacement (no partial updates)
+  - Delete settings
+- **Validation**:
+  - Verify userId exists and is valid
+  - Verify projectId exists and is valid
+  - Verify user has access to project (authorization check)
+  - Validate settings JSON structure (basic structure validation, not exhaustive field validation)
+- **Error Handling**:
+  - Return appropriate error if user/project not found
+  - Return 403 if user doesn't have access to project
+  - Handle gracefully if settings don't exist (return empty/default settings)
+- **No Complex Validation**: Focus on basic settings structure, not every JSON field
+
+### 5. Graph Operations
 - Implement graph traversal algorithms on Fact basis/support graph
 - Find shortest paths between Facts
 - Detect cycles in directed Fact graphs
@@ -104,21 +121,21 @@ You are a master of NestJS services and understand:
 - Implement graph search algorithms (BFS, DFS)
 - Handle graph mutations safely
 
-### 5. Domain Logic
+### 6. Domain Logic
 - Encode business rules for Fact state transitions
 - Validate domain constraints for Fact/Corpus relationships
 - Implement domain events for Fact changes
 - Handle Fact state transitions based on statement content
 - Manage Fact aggregates within Corpuses
 
-### 6. Data Orchestration
+### 7. Data Orchestration
 - Coordinate multiple repository calls
 - Implement complex queries
 - Handle data transformation
 - Manage caching strategies
 - Optimize data fetching
 
-### 7. Error Handling
+### 8. Error Handling
 - Throw appropriate exceptions
 - Validate preconditions
 - Handle edge cases

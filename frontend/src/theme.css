@@ -86,7 +86,8 @@
   --card-padding: var(--spacing-md);
 
   /* Corpus Column */
-  --corpus-column-width: 370px;
+  --corpus-column-width: 340px;
+  --corpus-actions-width: 50px;
 
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
