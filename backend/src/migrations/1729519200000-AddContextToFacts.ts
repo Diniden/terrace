@@ -2,19 +2,23 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddContextToFacts1729519200000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create the enum type
+    // Create the enum type if it doesn't exist
     await queryRunner.query(`
-      CREATE TYPE facts_context_enum AS ENUM (
-        'corpus_global',
-        'corpus_builder',
-        'corpus_knowledge'
-      );
+      DO $$ BEGIN
+        CREATE TYPE facts_context_enum AS ENUM (
+          'corpus_global',
+          'corpus_builder',
+          'corpus_knowledge'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
     `);
 
-    // Add the context column with default value
+    // Add the context column with default value if it doesn't exist
     await queryRunner.query(`
       ALTER TABLE facts
-      ADD COLUMN context facts_context_enum NOT NULL DEFAULT 'corpus_knowledge';
+      ADD COLUMN IF NOT EXISTS context facts_context_enum NOT NULL DEFAULT 'corpus_knowledge';
     `);
 
     // Update all existing facts to have context = 'corpus_knowledge'
@@ -24,14 +28,14 @@ export class AddContextToFacts1729519200000 implements MigrationInterface {
       WHERE context IS NULL;
     `);
 
-    // Create index on context column
+    // Create index on context column if it doesn't exist
     await queryRunner.query(`
-      CREATE INDEX "IDX_facts_context" ON facts(context);
+      CREATE INDEX IF NOT EXISTS "IDX_facts_context" ON facts(context);
     `);
 
-    // Create composite index on (corpus_id, context)
+    // Create composite index on (corpus_id, context) if it doesn't exist
     await queryRunner.query(`
-      CREATE INDEX "IDX_facts_corpus_id_context" ON facts(corpus_id, context);
+      CREATE INDEX IF NOT EXISTS "IDX_facts_corpus_id_context" ON facts(corpus_id, context);
     `);
   }
 

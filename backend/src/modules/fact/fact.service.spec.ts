@@ -60,8 +60,7 @@ describe('FactService', () => {
     state: FactState.READY,
     basis: undefined,
     basisId: undefined,
-    supports: [],
-    supportedBy: [],
+    linkedFacts: [],
   } as any as Fact;
 
   beforeEach(async () => {
@@ -142,8 +141,7 @@ describe('FactService', () => {
       const factWithRelations = {
         ...mockFact,
         basis: null,
-        supports: [],
-        supportedBy: [],
+        linkedFacts: [],
       };
 
       factRepository.findOne.mockResolvedValueOnce(factWithRelations as any);
@@ -164,8 +162,7 @@ describe('FactService', () => {
           'corpus',
           'corpus.project',
           'basis',
-          'supports',
-          'supportedBy',
+          'linkedFacts',
         ],
       });
 
@@ -276,14 +273,14 @@ describe('FactService', () => {
   });
 
   describe('create with supportedById', () => {
-    it('should create fact and establish support relationship when supportedById is provided', async () => {
+    it('should create fact and establish link relationship when supportedById is provided', async () => {
       const targetFact = {
         id: 'target-fact',
         statement: 'Target fact',
         corpusId: 'corpus-123',
         corpus: mockCorpus,
         context: FactContext.CORPUS_KNOWLEDGE,
-        supports: [],
+        linkedFacts: [],
       } as any as Fact;
 
       const createDto: CreateFactDto = {
@@ -309,7 +306,7 @@ describe('FactService', () => {
       const reloadedCreatedFact = {
         ...createdFact,
         corpus: mockCorpus,
-        supportedBy: [targetFact],
+        linkedFacts: [targetFact],
       } as any;
 
       factRepository.findOne
@@ -320,7 +317,7 @@ describe('FactService', () => {
 
       expect(factRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          supports: expect.arrayContaining([createdFact]),
+          linkedFacts: expect.arrayContaining([createdFact]),
         }),
       );
 
@@ -414,13 +411,13 @@ describe('FactService', () => {
       );
     });
 
-    it('should reload fact with relationships after establishing support', async () => {
+    it('should reload fact with relationships after establishing link', async () => {
       const targetFact = {
         id: 'target-fact',
         corpusId: 'corpus-123',
         corpus: mockCorpus,
         context: FactContext.CORPUS_KNOWLEDGE,
-        supports: [],
+        linkedFacts: [],
       } as any as Fact;
 
       const createDto: CreateFactDto = {
@@ -440,7 +437,7 @@ describe('FactService', () => {
 
       const reloadedFact = {
         ...createdFact,
-        supportedBy: [targetFact],
+        linkedFacts: [targetFact],
         corpus: mockCorpus,
       } as Fact;
 
@@ -461,8 +458,7 @@ describe('FactService', () => {
           'corpus',
           'corpus.project',
           'basis',
-          'supports',
-          'supportedBy',
+          'linkedFacts',
         ],
       });
     });

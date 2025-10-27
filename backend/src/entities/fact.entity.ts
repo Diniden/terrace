@@ -71,16 +71,15 @@ export class Fact {
   @Column({ name: 'basis_id', nullable: true })
   basisId: string;
 
-  @ManyToMany(() => Fact, (fact) => fact.supportedBy)
+  // Bidirectional link relationships - no directionality implied
+  // This represents facts that are linked to this fact through support relationships
+  @ManyToMany(() => Fact, (fact) => fact.linkedFacts)
   @JoinTable({
-    name: 'fact_support',
-    joinColumn: { name: 'fact_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'support_id', referencedColumnName: 'id' },
+    name: 'fact_links',
+    joinColumn: { name: 'fact_id_a', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'fact_id_b', referencedColumnName: 'id' },
   })
-  supports: Fact[];
-
-  @ManyToMany(() => Fact, (fact) => fact.supports)
-  supportedBy: Fact[];
+  linkedFacts: Fact[];
 
   @Column({
     type: 'enum',
@@ -97,6 +96,7 @@ export class Fact {
 
   // RAG Embedding Metadata
   @Column({
+    name: 'embedding_status',
     type: 'enum',
     enum: EmbeddingStatus,
     default: EmbeddingStatus.PENDING,

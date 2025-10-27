@@ -26,7 +26,7 @@ async function clearData() {
 
     // Delete in order of dependencies (child tables first)
     const tables = [
-      { name: 'fact_support', label: 'Fact supports' },
+      { name: 'fact_links', label: 'Fact links' },
       { name: 'facts', label: 'Facts' },
       { name: 'corpuses', label: 'Corpuses' },
       { name: 'project_members', label: 'Project members' },

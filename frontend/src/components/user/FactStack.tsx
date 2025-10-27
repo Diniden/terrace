@@ -23,8 +23,8 @@ interface FactStackProps {
 
 export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
   ({ stack, onUpdate, viewContext, onNavigateToBasis, onNavigateToDependents, dependentsCount = 0, onExpand, onCollapse, initialExpanded = false }, ref) => {
-    const { topFact, supportCount, facts } = stack;
-    const isStack = supportCount > 0;
+    const { topFact, linkedCount, facts } = stack;
+    const isStack = linkedCount > 0;
     const [isExpanded, setIsExpanded] = useState(initialExpanded);
 
     const handleBadgeClick = (e: React.MouseEvent) => {
@@ -52,7 +52,7 @@ export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
     };
 
     if (!isStack) {
-      // Render as a single FactCard if there are no supporting facts
+      // Render as a single FactCard if there are no linked facts
       return (
         <FactCard
           ref={ref}
@@ -122,14 +122,14 @@ export const FactStack = forwardRef<HTMLDivElement, FactStackProps>(
           </div>
         )}
 
-        {/* Stack count badge showing number of supporting facts - clickable to expand */}
+        {/* Stack count badge showing number of linked facts - clickable to expand */}
         {!isExpanded && (
           <div
             className="factStack__badge"
-            title={`${supportCount} supporting fact${supportCount !== 1 ? 's' : ''} - Click to expand`}
+            title={`${linkedCount} linked fact${linkedCount !== 1 ? 's' : ''} - Click to expand`}
             onClick={handleBadgeClick}
           >
-            {supportCount}
+            {linkedCount}
           </div>
         )}
       </div>

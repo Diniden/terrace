@@ -25,6 +25,7 @@ export const FactView: React.FC = () => {
   const factCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [isSelectingBasis, setIsSelectingBasis] = useState(false);
   const [parentCorpusFacts, setParentCorpusFacts] = useState<Fact[]>([]);
+  const [disableTransitions, setDisableTransitions] = useState(true);
 
   useEffect(() => {
     if (factId) {
@@ -35,7 +36,7 @@ export const FactView: React.FC = () => {
   // Focus the newly created fact's input field after it's rendered
   useEffect(() => {
     if (newlyCreatedFactId && !loading) {
-      // Wait for next tick to ensure DOM is updated
+      // Wait for next tick to ensure DOM is updated (reduced from 100ms to 50ms)
       setTimeout(() => {
         const factCardElement = factCardRefs.current.get(newlyCreatedFactId);
         if (factCardElement) {
@@ -43,13 +44,13 @@ export const FactView: React.FC = () => {
           const textareaInput = factCardElement.querySelector('textarea');
           if (textareaInput) {
             textareaInput.focus();
-            // Scroll the new fact into view if needed
-            factCardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Scroll the new fact into view instantly (changed from 'smooth' to 'auto')
+            factCardElement.scrollIntoView({ behavior: 'auto', block: 'nearest' });
           }
         }
         // Clear the newly created fact ID after focusing
         setNewlyCreatedFactId(null);
-      }, 100);
+      }, 50);
     }
   }, [newlyCreatedFactId, loading]);
 
@@ -57,6 +58,9 @@ export const FactView: React.FC = () => {
     if (!factId) return;
 
     setLoading(true);
+    // Disable transitions during initial data load
+    setDisableTransitions(true);
+
     try {
       // Use getOneWithRelationships to load the complete basis chain
       const factData = await factsApi.getOneWithRelationships(factId);
@@ -79,6 +83,11 @@ export const FactView: React.FC = () => {
       }
     } finally {
       setLoading(false);
+
+      // Re-enable transitions after view has settled (reduced from typical 300ms to 100ms)
+      setTimeout(() => {
+        setDisableTransitions(false);
+      }, 100);
     }
   };
 
@@ -98,7 +107,7 @@ export const FactView: React.FC = () => {
     }
   };
 
-  const handleAddSupportingFact = async () => {
+  const handleAddLinkedFact = async () => {
     if (!corpusId || !fact) return;
     try {
       const newFact = await factsApi.create({
@@ -107,9 +116,8 @@ export const FactView: React.FC = () => {
         state: FactStateEnum.CLARIFY,
       });
 
-      // Establish support relationship: newFact supports the current fact
-      // This means newFact.id will appear in fact.supportedBy array
-      await factsApi.addSupport(newFact.id, fact.id);
+      // Establish link relationship: newFact is linked to the current fact (bidirectional)
+      await factsApi.linkFacts(newFact.id, fact.id);
 
       // Store the newly created fact ID to focus it after reload
       setNewlyCreatedFactId(newFact.id);
@@ -117,7 +125,7 @@ export const FactView: React.FC = () => {
       // Reload fact data to get updated relationships
       await loadFactData();
     } catch (err) {
-      console.error('Failed to create supporting fact:', err);
+      console.error('Failed to create linked fact:', err);
     }
   };
 
@@ -208,7 +216,7 @@ export const FactView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="factView">
+      <div className={`factView ${disableTransitions ? 'factView--noTransitions' : ''}`}>
         <Spinner />
       </div>
     );
@@ -224,25 +232,8 @@ export const FactView: React.FC = () => {
     return null;
   }
 
-  // Combine supportedBy and supports arrays for bidirectional support relationships
-  const supportingFactsSet = new Set<string>();
-  const supportingFacts: Fact[] = [];
-
-  // Add facts that support this fact
-  fact.supportedBy?.forEach(f => {
-    if (f.context === fact.context && !supportingFactsSet.has(f.id)) {
-      supportingFactsSet.add(f.id);
-      supportingFacts.push(f);
-    }
-  });
-
-  // Add facts that this fact supports (bidirectional relationship)
-  fact.supports?.forEach(f => {
-    if (f.context === fact.context && !supportingFactsSet.has(f.id)) {
-      supportingFactsSet.add(f.id);
-      supportingFacts.push(f);
-    }
-  });
+  // Get all linked facts (bidirectional support relationship)
+  const linkedFacts = (fact.linkedFacts || []).filter(f => f.context === fact.context);
 
   const derivedFacts = fact.dependentFacts?.filter(f => f.context === fact.context) || [];
   const basisChain = fact.basisChain || [];
@@ -260,7 +251,7 @@ export const FactView: React.FC = () => {
   console.log('FactView render - childCorpus:', childCorpus);
 
   return (
-    <div className="factView">
+    <div className={`factView ${disableTransitions ? 'factView--noTransitions' : ''}`}>
       <PageHeader
         title={`${fact.corpus?.name || 'Corpus'} - Fact`}
         userEmail={userEmail}
@@ -404,28 +395,28 @@ export const FactView: React.FC = () => {
           </div>
         </div>
 
-        {/* Supporting Facts Region (Middle) */}
+        {/* Linked Facts Region (Middle) */}
         <div className="factView__supportingFactsRegion">
-          <div className="factView__regionHeader">Supporting Facts</div>
+          <div className="factView__regionHeader">Linked Facts</div>
           <div className="factView__supportingFactsRegionInner">
             <div className="factView__supportingFactsRegionContent">
-              {supportingFacts.length === 0 ? (
+              {linkedFacts.length === 0 ? (
                 <div className="factView__emptyState">
-                  <p>No supporting facts yet</p>
+                  <p>No linked facts yet</p>
                 </div>
               ) : (
                 <div className="factView__factGrid">
-                  {supportingFacts.map((supportFact) => (
+                  {linkedFacts.map((linkedFact) => (
                     <FactCard
-                      key={supportFact.id}
+                      key={linkedFact.id}
                       ref={(el) => {
                         if (el) {
-                          factCardRefs.current.set(supportFact.id, el);
+                          factCardRefs.current.set(linkedFact.id, el);
                         } else {
-                          factCardRefs.current.delete(supportFact.id);
+                          factCardRefs.current.delete(linkedFact.id);
                         }
                       }}
-                      fact={supportFact}
+                      fact={linkedFact}
                       onUpdate={handleUpdateFact}
                       viewContext="fact"
                     />
@@ -436,7 +427,7 @@ export const FactView: React.FC = () => {
             <div className="factView__supportingFactsRegionActions">
               <Button
                 className="factView__addFactButton"
-                onClick={handleAddSupportingFact}
+                onClick={handleAddLinkedFact}
               >
                 +
               </Button>

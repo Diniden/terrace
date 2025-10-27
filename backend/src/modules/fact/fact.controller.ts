@@ -28,6 +28,7 @@ import { FactService } from './fact.service';
 import { CreateFactDto } from './dto/create-fact.dto';
 import { UpdateFactDto } from './dto/update-fact.dto';
 import { AddSupportDto } from './dto/add-support.dto';
+import { LinkFactsDto } from './dto/link-facts.dto';
 import { SearchFactsDto } from './dto/search-facts.dto';
 import { FactSearchResultDto } from './dto/fact-search-result.dto';
 import { EmbeddingStatsDto } from './dto/embedding-stats.dto';
@@ -83,14 +84,14 @@ export class FactController {
     summary: 'Get a fact with all relationship context',
     description:
       'Retrieves a fact with complete relationship information including: ' +
-      'basis (parent fact), supports (facts this supports), supportedBy (facts supporting this), ' +
+      'basis (parent fact), linkedFacts (bidirectionally linked facts), ' +
       'dependentFacts (facts that use this as basis), and corpus details.',
   })
   @ApiResponse({
     status: 200,
     description:
       'Fact with all relationships retrieved successfully. ' +
-      'Includes basis, supports, supportedBy, dependentFacts, and corpus.',
+      'Includes basis, linkedFacts, dependentFacts, and corpus.',
   })
   @ApiResponse({ status: 404, description: 'Fact not found' })
   @ApiResponse({ status: 403, description: 'Access denied to this project' })
@@ -133,10 +134,49 @@ export class FactController {
     return { message: 'Fact deleted successfully' };
   }
 
+  @Post(':id/links')
+  @ApiOperation({
+    summary: 'Link a fact to another fact',
+    description:
+      'Creates a bidirectional link relationship between two facts. ' +
+      'Both facts must be in the same corpus and have the same context.',
+  })
+  @ApiResponse({ status: 201, description: 'Link relationship created' })
+  @ApiResponse({ status: 400, description: 'Invalid link relationship' })
+  async linkFacts(
+    @Param('id') id: string,
+    @Body() linkFactsDto: LinkFactsDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.linkFacts(id, linkFactsDto, user);
+  }
+
+  @Delete(':id/links/:linkedFactId')
+  @ApiOperation({
+    summary: 'Remove a fact link',
+    description: 'Removes the bidirectional link relationship between two facts.',
+  })
+  @ApiResponse({ status: 200, description: 'Link relationship removed' })
+  async unlinkFacts(
+    @Param('id') id: string,
+    @Param('linkedFactId') linkedFactId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.factService.unlinkFacts(id, linkedFactId, user);
+  }
+
+  // Deprecated endpoints for backward compatibility
   @Post(':id/support')
-  @ApiOperation({ summary: 'Add a supporting fact' })
-  @ApiResponse({ status: 201, description: 'Support relationship created' })
-  @ApiResponse({ status: 400, description: 'Invalid support relationship' })
+  @ApiOperation({
+    summary: '[Deprecated] Use POST /facts/:id/links instead',
+    description:
+      'Creates a bidirectional link relationship between two facts. ' +
+      'Both facts must be in the same corpus and have the same context. ' +
+      'This endpoint is deprecated; use POST /facts/:id/links instead.',
+    deprecated: true,
+  })
+  @ApiResponse({ status: 201, description: 'Link relationship created' })
+  @ApiResponse({ status: 400, description: 'Invalid link relationship' })
   async addSupport(
     @Param('id') id: string,
     @Body() addSupportDto: AddSupportDto,
@@ -146,8 +186,14 @@ export class FactController {
   }
 
   @Delete(':id/support/:supportFactId')
-  @ApiOperation({ summary: 'Remove a supporting fact' })
-  @ApiResponse({ status: 200, description: 'Support relationship removed' })
+  @ApiOperation({
+    summary: '[Deprecated] Use DELETE /facts/:id/links/:linkedFactId instead',
+    description:
+      'Removes the bidirectional link relationship between two facts. ' +
+      'This endpoint is deprecated; use DELETE /facts/:id/links/:linkedFactId instead.',
+    deprecated: true,
+  })
+  @ApiResponse({ status: 200, description: 'Link relationship removed' })
   async removeSupport(
     @Param('id') id: string,
     @Param('supportFactId') supportFactId: string,

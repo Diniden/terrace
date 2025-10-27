@@ -3,7 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class CreateChatMessages1729519500000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE chat_messages (
+      CREATE TABLE IF NOT EXISTS chat_messages (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         "userId" UUID NOT NULL,
         content TEXT NOT NULL,
@@ -16,7 +16,7 @@ export class CreateChatMessages1729519500000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE INDEX idx_chat_messages_user_created
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_user_created
       ON chat_messages ("userId", "createdAt");
     `);
   }

@@ -42,11 +42,11 @@ export const factsApi = {
     return apiClient.delete(`/facts/${id}`);
   },
 
-  async addSupport(factId: string, supportFactId: string): Promise<Fact> {
-    return apiClient.post<Fact>(`/facts/${factId}/support`, { supportFactId });
+  async linkFacts(factId: string, linkedFactId: string): Promise<Fact> {
+    return apiClient.post<Fact>(`/facts/${factId}/links`, { linkedFactId });
   },
 
-  async removeSupport(factId: string, supportFactId: string): Promise<Fact> {
-    return apiClient.delete<Fact>(`/facts/${factId}/support/${supportFactId}`);
+  async unlinkFacts(factId: string, linkedFactId: string): Promise<Fact> {
+    return apiClient.delete<Fact>(`/facts/${factId}/links/${linkedFactId}`);
   },
 };

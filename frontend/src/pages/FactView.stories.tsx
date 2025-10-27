@@ -103,7 +103,7 @@ const mockFactsApi = {
       updatedAt: '2024-01-01T00:00:00Z',
     };
   },
-  addSupport: async (factId: string, _supportFactId: string): Promise<Fact> => {
+  linkFacts: async (factId: string, _linkedFactId: string): Promise<Fact> => {
     return {
       id: factId,
       statement: 'Main fact',
@@ -193,12 +193,12 @@ export const WithBasisOnly: Story = {
   },
 };
 
-// Story: Fact with only supporting facts
-export const WithSupportingFactsOnly: Story = {
+// Story: Fact with only linked facts
+export const WithLinkedFactsOnly: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Displays a fact with supporting facts but no basis or derived facts.',
+        story: 'Displays a fact with linked facts but no basis or derived facts.',
       },
     },
   },
@@ -220,7 +220,7 @@ export const AllRelationships: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Displays a fact with basis, supporting facts, and derived facts.',
+        story: 'Displays a fact with basis, linked facts, and derived facts.',
       },
     },
   },

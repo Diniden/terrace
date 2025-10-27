@@ -2,6 +2,7 @@
 import { DataSource } from "typeorm";
 import { config } from "dotenv";
 import { resolve } from "path";
+import * as bcrypt from "bcrypt";
 
 // Load environment variables from backend
 config({ path: resolve(__dirname, "../backend/.env") });
@@ -43,6 +44,32 @@ interface Corpus {
 let globalFactCounter = 0;
 const factIdToNumber = new Map<string, number>();
 
+async function ensureDevUserExists(): Promise<void> {
+  const devEmail = "dev@geniant.com";
+  const devPassword = "dev123";
+
+  // Check if user already exists
+  const existingUser = await dataSource.query(
+    "SELECT id FROM users WHERE email = $1",
+    [devEmail]
+  );
+
+  // Silently skip if user exists
+  if (existingUser.length > 0) {
+    return;
+  }
+
+  // Hash password using bcrypt (10 rounds)
+  const hashedPassword = await bcrypt.hash(devPassword, 10);
+
+  // Create dev user with USER role (non-admin)
+  await dataSource.query(
+    `INSERT INTO users (email, password, "applicationRole")
+     VALUES ($1, $2, $3)`,
+    [devEmail, hashedPassword, "user"]
+  );
+}
+
 async function seedData() {
   console.log("🌱 Connecting to database...");
 
@@ -53,6 +80,9 @@ async function seedData() {
     // Reset global counter at start
     globalFactCounter = 0;
     factIdToNumber.clear();
+
+    // Ensure dev user exists
+    await ensureDevUserExists();
 
     // Get all users
     const users = await dataSource.query("SELECT id, email FROM users");
@@ -474,6 +504,9 @@ async function assignSiblingFacts(factIds: string[]): Promise<void> {
     return; // Need at least 2 facts to create siblings
   }
 
+  // Track which pairs have already been created to avoid duplicates
+  const createdPairs = new Set<string>();
+
   for (const factId of factIds) {
     // Pick 2-10 random sibling facts (excluding the fact itself)
     const siblingCount = Math.floor(Math.random() * 9) + 2; // 2 to 10
@@ -486,12 +519,20 @@ async function assignSiblingFacts(factIds: string[]): Promise<void> {
       Math.min(siblingCount, otherFactIds.length)
     );
 
-    // Create fact_support relationships
+    // Create bidirectional fact_links relationships
+    // Note: fact_id_a and fact_id_b are neutral positions - no directionality
     for (const siblingId of selectedSiblings) {
-      await dataSource.query(
-        `INSERT INTO fact_support (fact_id, support_id) VALUES ($1, $2)`,
-        [factId, siblingId]
-      );
+      // Create a normalized pair key (alphabetically ordered) to prevent duplicates
+      const pairKey = [factId, siblingId].sort().join('|');
+
+      // Only insert if we haven't already created this pair
+      if (!createdPairs.has(pairKey)) {
+        await dataSource.query(
+          `INSERT INTO fact_links (fact_id_a, fact_id_b) VALUES ($1, $2)`,
+          [factId, siblingId]
+        );
+        createdPairs.add(pairKey);
+      }
     }
   }
 }
@@ -531,7 +572,6 @@ async function seedUserProjectViewSettings(
     for (let i = 0; i < corpusesToConfigure.length; i++) {
       const corpus = corpusesToConfigure[i];
       const isFirstCorpus = i === 0;
-      const isSecondCorpus = i === 1;
 
       corpusSettings[corpus.id] = {
         scrollPosition: 0,

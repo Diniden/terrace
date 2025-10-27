@@ -8,26 +8,24 @@ export interface FactStack {
   topFact: Fact;
   /** All Facts in the stack (includes topFact) */
   facts: Fact[];
-  /** Number of Facts that support the topFact (bidirectional: supportedBy + supports) */
-  supportCount: number;
+  /** Number of Facts linked to the topFact (bidirectional support relationship) */
+  linkedCount: number;
 }
 
 /**
- * Computes FactStacks from a list of Facts based on supporting relationships.
+ * Computes FactStacks from a list of Facts based on linked relationships.
  *
  * Algorithm:
  * - Start with the list of Facts
  * - Create a Set to track which Facts are already stacked
  * - For each unprocessed Fact:
- *   - Gather all supporting Facts using BIDIRECTIONAL relationships:
- *     * Facts that support this fact (supportedBy relationship)
- *     * Facts that this fact supports (supports relationship)
+ *   - Gather all linked Facts from the linkedFacts array
  *   - Filter by same context and exclude already processed facts
  *   - Do not include any Facts already in the Set
  *   - These gathered Facts form the Stack with the current Fact on top
  *   - Add all gathered Facts to the Set
- * - The supportCount equals the number of bidirectional supporting facts
- * - This matches FactView's logic for displaying supporting facts
+ * - The linkedCount equals the number of linked facts
+ * - This matches FactView's logic for displaying linked facts
  *
  * @param facts - Array of Facts to organize into stacks
  * @returns Array of FactStacks
@@ -42,51 +40,37 @@ export function computeFactStacks(facts: Fact[]): FactStack[] {
       continue;
     }
 
-    // Gather all supporting facts that haven't been processed yet
-    // Use bidirectional approach: combine both supportedBy and supports arrays
-    // This matches FactView's logic (lines 227-245)
-    const supportingFactsSet = new Set<string>();
-    const supportingFacts: Fact[] = [];
+    // Gather all linked facts that haven't been processed yet
+    const linkedFactsSet = new Set<string>();
+    const linkedFacts: Fact[] = [];
 
-    // Add facts that support this fact (supportedBy relationship)
-    for (let i = 0, iMax = (fact.supportedBy || []).length; i < iMax; i++) {
-      const supportFact = (fact.supportedBy || [])[i];
+    // Add linked facts (bidirectional support relationship)
+    for (let i = 0, iMax = (fact.linkedFacts || []).length; i < iMax; i++) {
+      const linkedFact = (fact.linkedFacts || [])[i];
       if (
-        supportFact.context === fact.context &&
-        !processedFactIds.has(supportFact.id) &&
-        !supportingFactsSet.has(supportFact.id)
+        linkedFact.context === fact.context &&
+        !processedFactIds.has(linkedFact.id) &&
+        !linkedFactsSet.has(linkedFact.id)
       ) {
-        supportingFactsSet.add(supportFact.id);
+        linkedFactsSet.add(linkedFact.id);
+        linkedFacts.push(linkedFact);
       }
-      supportingFacts.push(supportFact);
     }
 
-    for (let i = 0, iMax = (fact.supports || []).length; i < iMax; i++) {
-      const supportFact = (fact.supports || [])[i];
-      if (
-        supportFact.context === fact.context &&
-        !processedFactIds.has(supportFact.id) &&
-        !supportingFactsSet.has(supportFact.id)
-      ) {
-        supportingFactsSet.add(supportFact.id);
-      }
-      supportingFacts.push(supportFact);
-    }
-
-    // Create a stack with this fact on top and all supporting facts
-    const stackFacts = [fact, ...supportingFacts];
+    // Create a stack with this fact on top and all linked facts
+    const stackFacts = [fact, ...linkedFacts];
 
     // Mark all facts in this stack as processed
     stackFacts.forEach((f) => processedFactIds.add(f.id));
 
-    // Count the bidirectional supporting facts (matches supportingFacts.length)
-    const supportCount = supportingFacts.length;
+    // Count the linked facts
+    const linkedCount = linkedFacts.length;
 
     // Create the stack
     stacks.push({
       topFact: fact,
       facts: stackFacts,
-      supportCount,
+      linkedCount,
     });
   }
 
@@ -94,8 +78,8 @@ export function computeFactStacks(facts: Fact[]): FactStack[] {
 }
 
 /**
- * Determines if a FactStack has supporting facts (is actually a stack)
+ * Determines if a FactStack has linked facts (is actually a stack)
  */
 export function isMultiFactStack(stack: FactStack): boolean {
-  return stack.supportCount > 0;
+  return stack.linkedCount > 0;
 }

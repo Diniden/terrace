@@ -69,8 +69,8 @@ export class CreateFactDto {
 
   @ApiProperty({
     description:
-      'UUID of an existing fact that this new fact will support. ' +
-      'Creates a support relationship immediately upon fact creation. ' +
+      'UUID of an existing fact that this new fact will link to. ' +
+      'Creates a bidirectional link relationship immediately upon fact creation. ' +
       'The target fact must exist and be in the same corpus with matching context.',
     format: 'uuid',
     required: false,

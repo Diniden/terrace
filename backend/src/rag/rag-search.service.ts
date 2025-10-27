@@ -92,7 +92,7 @@ export class RagSearchService {
       // Fetch full fact entities from database
       const facts = await this.factRepository.find({
         where: { id: In(factIds) },
-        relations: ['corpus', 'basis', 'supports', 'supportedBy'],
+        relations: ['corpus', 'basis', 'linkedFacts'],
       });
 
       // Create a map for quick lookup

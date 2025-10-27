@@ -4,42 +4,46 @@ export class AddEmbeddingMetadataToFacts1729519600000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create the enum type for embedding status
+    // Create the enum type for embedding status if it doesn't exist
     await queryRunner.query(`
-      CREATE TYPE facts_embedding_status_enum AS ENUM (
-        'pending',
-        'embedded',
-        'failed'
-      );
+      DO $$ BEGIN
+        CREATE TYPE facts_embedding_status_enum AS ENUM (
+          'pending',
+          'embedded',
+          'failed'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
     `);
 
-    // Add embedding_status column with default value
+    // Add embedding_status column with default value if it doesn't exist
     await queryRunner.query(`
       ALTER TABLE facts
-      ADD COLUMN embedding_status facts_embedding_status_enum NOT NULL DEFAULT 'pending';
+      ADD COLUMN IF NOT EXISTS embedding_status facts_embedding_status_enum NOT NULL DEFAULT 'pending';
     `);
 
-    // Add last_embedded_at timestamp column
+    // Add last_embedded_at timestamp column if it doesn't exist
     await queryRunner.query(`
       ALTER TABLE facts
-      ADD COLUMN last_embedded_at TIMESTAMP NULL;
+      ADD COLUMN IF NOT EXISTS last_embedded_at TIMESTAMP NULL;
     `);
 
-    // Add embedding_version column for tracking model version
+    // Add embedding_version column for tracking model version if it doesn't exist
     await queryRunner.query(`
       ALTER TABLE facts
-      ADD COLUMN embedding_version VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS embedding_version VARCHAR(100) NULL;
     `);
 
-    // Add embedding_model column for tracking provider/model
+    // Add embedding_model column for tracking provider/model if it doesn't exist
     await queryRunner.query(`
       ALTER TABLE facts
-      ADD COLUMN embedding_model VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS embedding_model VARCHAR(100) NULL;
     `);
 
-    // Create index on embedding_status for efficient querying of pending facts
+    // Create index on embedding_status for efficient querying of pending facts if it doesn't exist
     await queryRunner.query(`
-      CREATE INDEX "IDX_facts_embedding_status" ON facts(embedding_status);
+      CREATE INDEX IF NOT EXISTS "IDX_facts_embedding_status" ON facts(embedding_status);
     `);
 
     // Update existing facts:

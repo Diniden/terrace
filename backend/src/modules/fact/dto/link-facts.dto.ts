@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class AddSupportDto {
+export class LinkFactsDto {
   @ApiProperty({
     description:
       'UUID of the fact to create a bidirectional link relationship with. ' +
@@ -10,5 +10,5 @@ export class AddSupportDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  supportFactId: string;
+  linkedFactId: string;
 }

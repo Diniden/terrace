@@ -79,8 +79,7 @@ export interface Fact {
   basisId?: string;
   basis?: Fact;
   basisChain?: Partial<Fact>[];  // Complete chain from root to immediate parent (ordered)
-  supports?: Fact[];  // Facts this fact supports (many-to-many support relationship)
-  supportedBy?: Fact[];  // Facts that support this fact (many-to-many support relationship)
+  linkedFacts?: Fact[];  // Facts linked by support relationship (bidirectional, non-hierarchical)
   dependentFacts?: Fact[];  // Facts that have this fact as their basis (derived facts)
   state: FactState;
   context: FactContext;

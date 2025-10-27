@@ -32,24 +32,39 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Helper to create mock stack data
-const createMockStack = (supportCount: number, statement: string): FactStackType => ({
-  topFact: {
+const createMockStack = (linkedCount: number, statement: string): FactStackType => {
+  const topFact = {
     id: '1',
     statement,
-    state: 'confirmed',
-    context: 'corpus_knowledge',
+    state: 'confirmed' as const,
+    context: 'corpus_knowledge' as const,
     corpusId: 'corpus-1',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
-  },
-  supportCount,
-  supportingFacts: [],
-});
+  };
 
-// Default stack with a few supporting facts
+  // Create linked facts array
+  const linkedFacts = Array.from({ length: linkedCount }, (_, i) => ({
+    id: `linked-${i + 1}`,
+    statement: `Linked fact ${i + 1}`,
+    state: 'confirmed' as const,
+    context: 'corpus_knowledge' as const,
+    corpusId: 'corpus-1',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+  }));
+
+  return {
+    topFact,
+    linkedCount,
+    facts: [topFact, ...linkedFacts],
+  };
+};
+
+// Default stack with a few linked facts
 export const Default: Story = {
   args: {
-    stack: createMockStack(3, 'This is a standard fact with three supporting facts'),
+    stack: createMockStack(3, 'This is a standard fact with three linked facts'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -58,7 +73,7 @@ export const Default: Story = {
 // Single fact (no stack)
 export const SingleFact: Story = {
   args: {
-    stack: createMockStack(0, 'This is a single fact with no supporting facts'),
+    stack: createMockStack(0, 'This is a single fact with no linked facts'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -67,7 +82,7 @@ export const SingleFact: Story = {
 // Stack with single digit count
 export const SingleDigitCount: Story = {
   args: {
-    stack: createMockStack(5, 'Stack with single digit count (5 supporting facts)'),
+    stack: createMockStack(5, 'Stack with single digit count (5 linked facts)'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -76,7 +91,7 @@ export const SingleDigitCount: Story = {
 // Stack with double digit count - demonstrates pill shape
 export const DoubleDigitCount: Story = {
   args: {
-    stack: createMockStack(12, 'Stack with double digit count (12 supporting facts) - badge should form a pill shape'),
+    stack: createMockStack(12, 'Stack with double digit count (12 linked facts) - badge should form a pill shape'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -85,7 +100,7 @@ export const DoubleDigitCount: Story = {
 // Stack with triple digit count - demonstrates pill expansion
 export const TripleDigitCount: Story = {
   args: {
-    stack: createMockStack(123, 'Stack with triple digit count (123 supporting facts) - badge should expand to accommodate'),
+    stack: createMockStack(123, 'Stack with triple digit count (123 linked facts) - badge should expand to accommodate'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -106,19 +121,7 @@ export const LongContent: Story = {
 // Different states
 export const ClarifyState: Story = {
   args: {
-    stack: {
-      topFact: {
-        id: '2',
-        statement: 'Fact in clarify state with supporting facts',
-        state: 'clarify',
-        context: 'corpus_knowledge',
-        corpusId: 'corpus-1',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-      supportCount: 4,
-      supportingFacts: [],
-    },
+    stack: createMockStack(4, 'Fact in clarify state with linked facts'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -129,15 +132,43 @@ export const ConflictState: Story = {
     stack: {
       topFact: {
         id: '3',
-        statement: 'Fact in conflict state with supporting facts',
+        statement: 'Fact in conflict state with linked facts',
         state: 'conflict',
         context: 'corpus_knowledge',
         corpusId: 'corpus-1',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
       },
-      supportCount: 2,
-      supportingFacts: [],
+      linkedCount: 2,
+      facts: [
+        {
+          id: '3',
+          statement: 'Fact in conflict state with linked facts',
+          state: 'conflict',
+          context: 'corpus_knowledge',
+          corpusId: 'corpus-1',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+        {
+          id: 'linked-1',
+          statement: 'Linked fact 1',
+          state: 'confirmed',
+          context: 'corpus_knowledge',
+          corpusId: 'corpus-1',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+        {
+          id: 'linked-2',
+          statement: 'Linked fact 2',
+          state: 'confirmed',
+          context: 'corpus_knowledge',
+          corpusId: 'corpus-1',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ],
     },
     viewContext: 'project',
     dependentsCount: 0,
@@ -146,19 +177,7 @@ export const ConflictState: Story = {
 
 export const RejectedState: Story = {
   args: {
-    stack: {
-      topFact: {
-        id: '4',
-        statement: 'Fact in rejected state with supporting facts',
-        state: 'rejected',
-        context: 'corpus_knowledge',
-        corpusId: 'corpus-1',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-      supportCount: 1,
-      supportingFacts: [],
-    },
+    stack: createMockStack(1, 'Fact in rejected state with linked facts'),
     viewContext: 'project',
     dependentsCount: 0,
   },
@@ -178,8 +197,28 @@ export const WithBasisButton: Story = {
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
       },
-      supportCount: 8,
-      supportingFacts: [],
+      linkedCount: 8,
+      facts: [
+        {
+          id: '5',
+          statement: 'Fact with basis - shows basis navigation button',
+          state: 'confirmed',
+          context: 'corpus_knowledge',
+          corpusId: 'corpus-1',
+          basisId: 'basis-fact-1',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+        ...Array.from({ length: 8 }, (_, i) => ({
+          id: `linked-${i + 1}`,
+          statement: `Linked fact ${i + 1}`,
+          state: 'confirmed' as const,
+          context: 'corpus_knowledge' as const,
+          corpusId: 'corpus-1',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        })),
+      ],
     },
     viewContext: 'project',
     dependentsCount: 0,

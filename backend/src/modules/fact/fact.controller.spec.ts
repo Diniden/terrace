@@ -46,8 +46,7 @@ describe('FactController', () => {
     context: FactContext.CORPUS_KNOWLEDGE,
     basisId: undefined,
     basis: undefined,
-    supports: [],
-    supportedBy: [],
+    linkedFacts: [],
     dependentFacts: [],
     state: FactState.READY,
     meta: {},
@@ -66,6 +65,8 @@ describe('FactController', () => {
     create: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+    linkFacts: jest.fn(),
+    unlinkFacts: jest.fn(),
     addSupport: jest.fn(),
     removeSupport: jest.fn(),
   };
@@ -125,19 +126,17 @@ describe('FactController', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-        supports: [
+        linkedFacts: [
           {
-            id: 'support-fact-123',
-            statement: 'Supporting fact',
+            id: 'linked-fact-123',
+            statement: 'Linked fact 1',
             corpusId: 'corpus-123',
             context: FactContext.CORPUS_KNOWLEDGE,
             state: FactState.READY,
           },
-        ],
-        supportedBy: [
           {
-            id: 'supporter-fact-123',
-            statement: 'Supporter fact',
+            id: 'linked-fact-456',
+            statement: 'Linked fact 2',
             corpusId: 'corpus-123',
             context: FactContext.CORPUS_KNOWLEDGE,
             state: FactState.READY,
@@ -170,8 +169,7 @@ describe('FactController', () => {
         mockUser,
       );
       expect(result.basis).toBeDefined();
-      expect(result.supports).toHaveLength(1);
-      expect(result.supportedBy).toHaveLength(1);
+      expect(result.linkedFacts).toHaveLength(2);
       expect(result.dependentFacts).toHaveLength(1);
     });
 
@@ -179,8 +177,7 @@ describe('FactController', () => {
       const mockFactNoRelationships = {
         ...mockFact,
         basis: undefined,
-        supports: [],
-        supportedBy: [],
+        linkedFacts: [],
         dependentFacts: [],
       } as any;
 
@@ -195,8 +192,7 @@ describe('FactController', () => {
 
       expect(result).toEqual(mockFactNoRelationships);
       expect(result.basis).toBeUndefined();
-      expect(result.supports).toEqual([]);
-      expect(result.supportedBy).toEqual([]);
+      expect(result.linkedFacts).toEqual([]);
       expect(result.dependentFacts).toEqual([]);
     });
 
@@ -231,10 +227,10 @@ describe('FactController', () => {
     });
   });
 
-  describe('create with supportedById', () => {
+  describe('create with supportedById (creates bidirectional link)', () => {
     it('should create a fact with supportedById relationship', async () => {
       const createDto: CreateFactDto = {
-        statement: 'New supporting fact',
+        statement: 'New linked fact',
         corpusId: 'corpus-123',
         context: FactContext.CORPUS_KNOWLEDGE,
         supportedById: 'target-fact-123',
@@ -248,8 +244,7 @@ describe('FactController', () => {
         context: FactContext.CORPUS_KNOWLEDGE,
         basisId: undefined,
         basis: undefined,
-        supports: [],
-        supportedBy: [],
+        linkedFacts: [],
         dependentFacts: [],
         state: FactState.READY,
         meta: {},
@@ -264,8 +259,8 @@ describe('FactController', () => {
       const createdFact = {
         ...mockFact,
         id: 'new-fact-123',
-        statement: 'New supporting fact',
-        supportedBy: [targetFact],
+        statement: 'New linked fact',
+        linkedFacts: [targetFact],
       } as any;
 
       mockFactService.create.mockResolvedValue(createdFact);
@@ -274,12 +269,12 @@ describe('FactController', () => {
 
       expect(result).toEqual(createdFact);
       expect(service.create).toHaveBeenCalledWith(createDto, mockUser);
-      expect(result.supportedBy).toContainEqual(targetFact);
+      expect(result.linkedFacts).toContainEqual(targetFact);
     });
 
     it('should create a fact without supportedById (normal creation)', async () => {
       const createDto: CreateFactDto = {
-        statement: 'New fact without support',
+        statement: 'New fact without links',
         corpusId: 'corpus-123',
         context: FactContext.CORPUS_KNOWLEDGE,
       };
@@ -287,8 +282,8 @@ describe('FactController', () => {
       const createdFact = {
         ...mockFact,
         id: 'new-fact-456',
-        statement: 'New fact without support',
-        supportedBy: [],
+        statement: 'New fact without links',
+        linkedFacts: [],
       } as any;
 
       mockFactService.create.mockResolvedValue(createdFact);
@@ -297,18 +292,18 @@ describe('FactController', () => {
 
       expect(result).toEqual(createdFact);
       expect(service.create).toHaveBeenCalledWith(createDto, mockUser);
-      expect(result.supportedBy).toEqual([]);
+      expect(result.linkedFacts).toEqual([]);
     });
 
     it('should throw NotFoundException when target fact does not exist', async () => {
       const createDto: CreateFactDto = {
-        statement: 'New supporting fact',
+        statement: 'New linked fact',
         corpusId: 'corpus-123',
         supportedById: 'non-existent-fact',
       };
 
       mockFactService.create.mockRejectedValue(
-        new NotFoundException('Target fact to support not found'),
+        new NotFoundException('Target fact to link not found'),
       );
 
       await expect(controller.create(createDto, mockUser)).rejects.toThrow(
@@ -320,19 +315,19 @@ describe('FactController', () => {
 
     it('should reject supportedById if target fact is in different corpus', async () => {
       const createDto: CreateFactDto = {
-        statement: 'New supporting fact',
+        statement: 'New linked fact',
         corpusId: 'corpus-123',
         supportedById: 'other-corpus-fact',
       };
 
       mockFactService.create.mockRejectedValue(
         new Error(
-          'Cannot create support relationship: target fact must be in the same corpus',
+          'Cannot create link relationship: target fact must be in the same corpus',
         ),
       );
 
       await expect(controller.create(createDto, mockUser)).rejects.toThrow(
-        'Cannot create support relationship: target fact must be in the same corpus',
+        'Cannot create link relationship: target fact must be in the same corpus',
       );
 
       expect(service.create).toHaveBeenCalledWith(createDto, mockUser);
@@ -340,7 +335,7 @@ describe('FactController', () => {
 
     it('should reject supportedById if contexts do not match', async () => {
       const createDto: CreateFactDto = {
-        statement: 'New supporting fact',
+        statement: 'New linked fact',
         corpusId: 'corpus-123',
         context: FactContext.CORPUS_KNOWLEDGE,
         supportedById: 'global-fact-123',
@@ -348,12 +343,12 @@ describe('FactController', () => {
 
       mockFactService.create.mockRejectedValue(
         new Error(
-          'Cannot create support relationship between different contexts: corpus_knowledge and corpus_global',
+          'Cannot create link relationship between different contexts: corpus_knowledge and corpus_global',
         ),
       );
 
       await expect(controller.create(createDto, mockUser)).rejects.toThrow(
-        'Cannot create support relationship between different contexts',
+        'Cannot create link relationship between different contexts',
       );
 
       expect(service.create).toHaveBeenCalledWith(createDto, mockUser);

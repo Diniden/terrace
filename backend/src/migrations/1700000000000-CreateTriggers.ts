@@ -16,15 +16,16 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
     `);
 
     // Create function to decouple relationships when corpus changes
+    // NOTE: This function will be updated by the RefactorFactSupportToNeutralRelationship migration
+    // to use the correct table name (fact_links instead of fact_support)
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION decouple_fact_relationships_on_corpus_change()
       RETURNS TRIGGER AS $$
       BEGIN
         IF OLD.corpus_id IS DISTINCT FROM NEW.corpus_id THEN
-          -- Remove support relationships where this fact supports others
-          DELETE FROM fact_support WHERE fact_id = NEW.id;
-          -- Remove support relationships where this fact is supported
-          DELETE FROM fact_support WHERE support_id = NEW.id;
+          -- Remove all fact link relationships for this fact
+          -- Use fact_links table (created in InitialSchema migration)
+          DELETE FROM fact_links WHERE fact_id_a = NEW.id OR fact_id_b = NEW.id;
           -- Clear basis
           NEW.basis_id = NULL;
         END IF;
@@ -60,35 +61,8 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       $$ LANGUAGE plpgsql;
     `);
 
-    // Create function to validate fact support relationships
-    await queryRunner.query(`
-      CREATE OR REPLACE FUNCTION validate_fact_support()
-      RETURNS TRIGGER AS $$
-      DECLARE
-        supporting_corpus_id UUID;
-        supported_corpus_id UUID;
-      BEGIN
-        -- Get corpus_id for both facts
-        SELECT corpus_id INTO supporting_corpus_id
-        FROM facts WHERE id = NEW.fact_id;
-
-        SELECT corpus_id INTO supported_corpus_id
-        FROM facts WHERE id = NEW.support_id;
-
-        -- Validate same corpus
-        IF supporting_corpus_id IS DISTINCT FROM supported_corpus_id THEN
-          RAISE EXCEPTION 'Support relationship must be between facts in the same corpus';
-        END IF;
-
-        -- Prevent self-support
-        IF NEW.fact_id = NEW.support_id THEN
-          RAISE EXCEPTION 'A fact cannot support itself';
-        END IF;
-
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-    `);
+    // NOTE: validate_fact_support function and trigger are created by
+    // the RefactorFactSupportToNeutralRelationship migration
 
     // Create trigger for automatic fact state management
     await queryRunner.query(`
@@ -113,21 +87,10 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       FOR EACH ROW
       EXECUTE FUNCTION validate_fact_basis();
     `);
-
-    // Create trigger for validating fact support relationships
-    await queryRunner.query(`
-      CREATE TRIGGER trigger_validate_fact_support
-      BEFORE INSERT OR UPDATE ON fact_support
-      FOR EACH ROW
-      EXECUTE FUNCTION validate_fact_support();
-    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers first
-    await queryRunner.query(
-      `DROP TRIGGER IF EXISTS trigger_validate_fact_support ON fact_support;`,
-    );
     await queryRunner.query(
       `DROP TRIGGER IF EXISTS trigger_validate_fact_basis ON facts;`,
     );
@@ -138,8 +101,7 @@ export class CreateTriggers1700000000000 implements MigrationInterface {
       `DROP TRIGGER IF EXISTS trigger_set_fact_state_on_empty_statement ON facts;`,
     );
 
-    // Drop functions
-    await queryRunner.query(`DROP FUNCTION IF EXISTS validate_fact_support();`);
+    // Drop functions (but not validate_fact_support - that's owned by RefactorFactSupportToNeutralRelationship)
     await queryRunner.query(`DROP FUNCTION IF EXISTS validate_fact_basis();`);
     await queryRunner.query(
       `DROP FUNCTION IF EXISTS decouple_fact_relationships_on_corpus_change();`,

@@ -17,6 +17,7 @@ import { User, ApplicationRole } from '../../entities/user.entity';
 import { CreateFactDto } from './dto/create-fact.dto';
 import { UpdateFactDto } from './dto/update-fact.dto';
 import { AddSupportDto } from './dto/add-support.dto';
+import { LinkFactsDto } from './dto/link-facts.dto';
 import { RagEmbeddingService } from '../../rag/rag-embedding.service';
 
 @Injectable()
@@ -45,8 +46,7 @@ export class FactService {
       .createQueryBuilder('fact')
       .leftJoinAndSelect('fact.corpus', 'corpus')
       .leftJoinAndSelect('fact.basis', 'basis')
-      .leftJoinAndSelect('fact.supports', 'supports')
-      .leftJoinAndSelect('fact.supportedBy', 'supportedBy')
+      .leftJoinAndSelect('fact.linkedFacts', 'linkedFacts')
       .skip(skip)
       .take(limit)
       .orderBy('fact.createdAt', 'DESC');
@@ -87,8 +87,7 @@ export class FactService {
         'corpus',
         'corpus.project',
         'basis',
-        'supports',
-        'supportedBy',
+        'linkedFacts',
       ],
     });
 
@@ -108,7 +107,7 @@ export class FactService {
 
   /**
    * Find fact with complete relationship context for detailed view
-   * Loads: basis, supports, supportedBy, dependentFacts, corpus, basisChain
+   * Loads: basis, linkedFacts, dependentFacts, corpus, basisChain
    */
   async findOneWithRelationships(id: string, user: User): Promise<Fact> {
     const fact = await this.factRepository.findOne({
@@ -117,8 +116,7 @@ export class FactService {
         'corpus',
         'corpus.project',
         'basis',
-        'supports',
-        'supportedBy',
+        'linkedFacts',
       ],
     });
 
@@ -248,7 +246,7 @@ export class FactService {
     // Find facts by context
     return this.factRepository.find({
       where: { corpusId, context },
-      relations: ['basis', 'supports'],
+      relations: ['basis', 'linkedFacts'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -335,36 +333,36 @@ export class FactService {
 
     const savedFact = await this.factRepository.save(fact);
 
-    // If supportedById is provided, create the support relationship
+    // If supportedById is provided, create the bidirectional link relationship
     if (supportedById) {
       const targetFact = await this.factRepository.findOne({
         where: { id: supportedById },
-        relations: ['corpus', 'supports'],
+        relations: ['corpus', 'linkedFacts'],
       });
 
       if (!targetFact) {
-        throw new NotFoundException('Target fact to support not found');
+        throw new NotFoundException('Target fact to link not found');
       }
 
       // Validate target fact is in same corpus
       if (targetFact.corpusId !== corpusId) {
         throw new BadRequestException(
-          'Cannot create support relationship: target fact must be in the same corpus',
+          'Cannot create link relationship: target fact must be in the same corpus',
         );
       }
 
       // Validate both facts have the same context
       if (targetFact.context !== factContext) {
         throw new BadRequestException(
-          `Cannot create support relationship between different contexts: ${factContext} and ${targetFact.context}`,
+          `Cannot create link relationship between different contexts: ${factContext} and ${targetFact.context}`,
         );
       }
 
-      // Add the new fact as supporting the target fact
-      if (!targetFact.supports) {
-        targetFact.supports = [];
+      // Add the new fact to the target fact's linked facts (bidirectional)
+      if (!targetFact.linkedFacts) {
+        targetFact.linkedFacts = [];
       }
-      targetFact.supports.push(savedFact);
+      targetFact.linkedFacts.push(savedFact);
       await this.factRepository.save(targetFact);
     }
 
@@ -374,7 +372,7 @@ export class FactService {
       this.ragEmbeddingService.processFactEmbedding(savedFact.id);
     }
 
-    // Reload fact with relationships if supportedById was used
+    // Reload fact with relationships if linked to another fact
     if (supportedById) {
       return this.findOne(savedFact.id, user);
     }
@@ -525,13 +523,21 @@ export class FactService {
     this.ragEmbeddingService.deleteFactEmbedding(id);
   }
 
-  async addSupport(
+  /**
+   * Create a bidirectional link relationship between two facts
+   * Both facts must be in the same corpus and have the same context
+   */
+  async linkFacts(
     id: string,
-    addSupportDto: AddSupportDto,
+    linkFactsDto: LinkFactsDto | AddSupportDto,
     user: User,
   ): Promise<Fact> {
     const fact = await this.findOne(id, user);
-    const { supportFactId } = addSupportDto;
+    // Support both old and new DTO property names
+    const linkedFactId =
+      'linkedFactId' in linkFactsDto
+        ? linkFactsDto.linkedFactId
+        : linkFactsDto.supportFactId;
 
     // Check access
     await this.checkProjectAccess(
@@ -540,47 +546,50 @@ export class FactService {
       ProjectRole.CONTRIBUTOR,
     );
 
-    // Get support fact
-    const supportFact = await this.factRepository.findOne({
-      where: { id: supportFactId },
+    // Get the fact to link
+    const linkedFact = await this.factRepository.findOne({
+      where: { id: linkedFactId },
       relations: ['corpus'],
     });
 
-    if (!supportFact) {
-      throw new NotFoundException('Support fact not found');
+    if (!linkedFact) {
+      throw new NotFoundException('Fact to link not found');
     }
 
-    // Support fact must be in same corpus
-    if (supportFact.corpusId !== fact.corpusId) {
-      throw new BadRequestException('Support fact must be in the same corpus');
+    // Linked fact must be in same corpus
+    if (linkedFact.corpusId !== fact.corpusId) {
+      throw new BadRequestException('Linked fact must be in the same corpus');
     }
 
     // Validate both facts have the SAME context
-    if (fact.context !== supportFact.context) {
+    if (fact.context !== linkedFact.context) {
       throw new BadRequestException(
-        `Cannot create support relationship between different contexts: ${fact.context} and ${supportFact.context}`,
+        `Cannot create link relationship between different contexts: ${fact.context} and ${linkedFact.context}`,
       );
     }
 
-    // Add support relationship
-    if (!fact.supports) {
-      fact.supports = [];
+    // Add bidirectional link relationship
+    if (!fact.linkedFacts) {
+      fact.linkedFacts = [];
     }
 
-    // Check if already supporting
-    const alreadySupports = fact.supports.some((s) => s.id === supportFactId);
+    // Check if already linked
+    const alreadyLinked = fact.linkedFacts.some((f) => f.id === linkedFactId);
 
-    if (!alreadySupports) {
-      fact.supports.push(supportFact);
+    if (!alreadyLinked) {
+      fact.linkedFacts.push(linkedFact);
       await this.factRepository.save(fact);
     }
 
     return this.findOne(id, user);
   }
 
-  async removeSupport(
+  /**
+   * Remove a bidirectional link relationship between two facts
+   */
+  async unlinkFacts(
     id: string,
-    supportFactId: string,
+    linkedFactId: string,
     user: User,
   ): Promise<Fact> {
     const fact = await this.findOne(id, user);
@@ -592,13 +601,31 @@ export class FactService {
       ProjectRole.CONTRIBUTOR,
     );
 
-    // Remove support relationship
-    if (fact.supports) {
-      fact.supports = fact.supports.filter((s) => s.id !== supportFactId);
+    // Remove bidirectional link relationship
+    if (fact.linkedFacts) {
+      fact.linkedFacts = fact.linkedFacts.filter((f) => f.id !== linkedFactId);
       await this.factRepository.save(fact);
     }
 
     return this.findOne(id, user);
+  }
+
+  // Deprecated: Use linkFacts instead
+  async addSupport(
+    id: string,
+    addSupportDto: AddSupportDto,
+    user: User,
+  ): Promise<Fact> {
+    return this.linkFacts(id, addSupportDto, user);
+  }
+
+  // Deprecated: Use unlinkFacts instead
+  async removeSupport(
+    id: string,
+    supportFactId: string,
+    user: User,
+  ): Promise<Fact> {
+    return this.unlinkFacts(id, supportFactId, user);
   }
 
   /**
